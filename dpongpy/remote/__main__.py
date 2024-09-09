@@ -3,7 +3,6 @@ import argparse
 import threading
 import queue
 
-
 def arg_parser():
     ap = argparse.ArgumentParser()
     mode = ap.add_argument_group("mode")
@@ -27,16 +26,20 @@ class Echoer:
         self._thread_remote_consumer = threading.Thread(target=self._consume_remote)
         self._thread_outgoing_propagator = threading.Thread(target=self._propagate_outgoing)
         self._threads = set(getattr(self, name) for name in dir(self) if name.startswith('_thread_'))
-    
+
     @property
     def is_client(self):
         return not self.is_server
-    
+
     def __enter__(self):
+        '''
+        Used to permit the usage of the with statement.
+        It starts the threads and returns the object itself.
+        '''
         for thread in self._threads:
             thread.start()
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._thread_stdin_consumer.join()
         self._thread_outgoing_propagator.join()
@@ -45,15 +48,23 @@ class Echoer:
         self._session.close()
 
     def _consume_stdin(self):
+        '''
+        Reads from stdin and puts the input in the queue.
+        '''
         while self._running:
             try:
+                # puts input in the queue
                 self._outgoing.put(input() + "\n")
             except EOFError:
                 self._outgoing.put(b'')
                 break
 
     def _consume_remote(self):
+        '''
+        Reads from the remote peer and prints the message.
+        '''
         while self._running:
+            # reads the message from the remote peer
             msg = self._session.receive()
             if len(msg) > 0:
                 print(msg, end='', flush=True)
@@ -61,6 +72,10 @@ class Echoer:
                 break
 
     def _propagate_outgoing(self):
+        '''
+        Sends the messages in the queue to the remote peer.
+
+        '''
         while self._running:
             msg = self._outgoing.get()
             self._session.send(msg)

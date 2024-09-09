@@ -1,3 +1,4 @@
+from typing import Optional
 from dpongpy.model import Pong, Config, Direction
 from dpongpy.controller.local import ActionMap, PongLocalController as PongController
 import pygame
@@ -10,16 +11,18 @@ class Settings:
     debug: bool = False
     size: tuple = (800, 600)
     fps: int = 60
-    host: str = None
-    port: int = None
-    initial_paddles: tuple[Direction] = (Direction.LEFT, Direction.RIGHT)
+    host: Optional[str] = None
+    port: Optional[int] = None
+    # i guess they are the lines in which each of the paddles can move
+    # LEFT refers to the left side of the screen and RIGHT to the right one
+    initial_paddles: tuple[Direction, Direction] = (Direction.LEFT, Direction.RIGHT)
 
 
 class PongGame:
     def __init__(self, settings: Settings = None):
         self.settings = settings or Settings()
         self.pong = Pong(
-            size=self.settings.size, 
+            size=self.settings.size,
             config=self.settings.config,
             paddles=self.settings.initial_paddles
         )
@@ -30,6 +33,9 @@ class PongGame:
         self.controller = self.create_controller(settings.initial_paddles)
 
     def create_view(self):
+        '''
+        Creates 
+        '''
         from dpongpy.view import ScreenPongView
         return ScreenPongView(self.pong, debug=self.settings.debug)
 

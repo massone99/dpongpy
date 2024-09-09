@@ -1,4 +1,5 @@
 import dpongpy.model
+import dpongpy.controller
 import argparse
 
 
@@ -50,10 +51,11 @@ settings = args_to_settings(args)
 #     exit(0)
 if args.mode == 'local':
     if not settings.initial_paddles:
-        settings.initial_paddles = [dpongpy.model.Direction.LEFT, dpongpy.model.Direction.RIGHT]
+        settings.initial_paddles = (dpongpy.model.Direction.LEFT, dpongpy.model.Direction.RIGHT)
     dpongpy.main(settings)
     exit(0)
 if args.mode == 'centralised':
+    # the package remote is all about the distributed version of the game
     import dpongpy.remote.centralised
     if args.role == 'coordinator':
         dpongpy.remote.centralised.main_coordinator(settings)

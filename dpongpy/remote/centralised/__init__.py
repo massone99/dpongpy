@@ -1,24 +1,34 @@
-from pygame.event import Event
-import pygame
-from dpongpy import PongGame, Settings
-from dpongpy.model import *
-from dpongpy.controller import ControlEvent
-from dpongpy.remote.udp import Server, Client
-from dpongpy.remote.presentation import serialize, deserialize
 import threading
 
+import pygame
+from pygame.event import Event
+
+from dpongpy import PongGame, Settings
+from dpongpy.controller import ControlEvent
+from dpongpy.model import *
+from dpongpy.remote.presentation import deserialize, serialize
+from dpongpy.remote.udp import Client, Server
 
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12345
 
 
 class PongCoordinator(PongGame):
+    '''
+    A PongGame that acts as the central server/coordinator for the game.
+    It:
+        - Initializes a server to handle communication with terminals.
+        - Manages the game state and broadcasts updates to all connected terminals.
+        - Handles incoming messages from terminals in a separate thread.
+    '''
 
     def __init__(self, settings: Settings = None):
         settings = settings or Settings()
         settings.initial_paddles = []
         super().__init__(settings)
         self.pong.reset_ball((0, 0))
+        # TODO: this is where the usage of ZeroMQ should be introduced
+        # since the Server implementation is where UDP is used
         self.server = Server(self.settings.port or DEFAULT_PORT)
         self._thread_receiver = threading.Thread(target=self.__handle_ingoing_messages, daemon=True)
         self._thread_receiver.start()
@@ -26,8 +36,8 @@ class PongCoordinator(PongGame):
         self._lock = threading.RLock()
 
     def create_view(coordinator):
-        from dpongpy.view import ShowNothingPongView
         from dpongpy.controller.local import ControlEvent
+        from dpongpy.view import ShowNothingPongView
 
         class SendToPeersPongView(ShowNothingPongView):
             def render(self):
@@ -37,8 +47,8 @@ class PongCoordinator(PongGame):
         return SendToPeersPongView(coordinator.pong)
 
     def create_controller(coordinator, paddle_commands):
-        from dpongpy.controller.local import PongEventHandler, InputHandler
-        
+        from dpongpy.controller.local import InputHandler, PongEventHandler
+
         class Controller(PongEventHandler, InputHandler):
             def __init__(self, pong: Pong):
                 PongEventHandler.__init__(self, pong)
@@ -84,7 +94,7 @@ class PongCoordinator(PongGame):
     def peers(self):
         with self._lock:
             return set(self._peers)
-    
+
     @peers.setter
     def peers(self, value):
         with self._lock:
@@ -120,6 +130,13 @@ class PongCoordinator(PongGame):
 
 
 class PongTerminal(PongGame):
+    '''
+    A PongGame that runs in terminal mode, i.e. it is controlled by the user.
+    It:
+    - Connects to the coordinator as a client.
+    - Handles local player input and sends it to the coordinator.
+    - Receives game state updates from the coordinator and updates the local game state.
+    '''
 
     def __init__(self, settings: Settings = None):
         settings = settings or Settings()
@@ -131,7 +148,7 @@ class PongTerminal(PongGame):
         self._thread_receiver.start()
 
     def create_controller(terminal, paddle_commands = None):
-        from dpongpy.controller.local import PongInputHandler, EventHandler
+        from dpongpy.controller.local import EventHandler, PongInputHandler
 
         class Controller(PongInputHandler, EventHandler):
             def __init__(self, pong: Pong, paddle_commands):
@@ -157,9 +174,9 @@ class PongTerminal(PongGame):
 
             def on_game_over(self, pong: Pong):
                 terminal.stop()
-        
+
         return Controller(terminal.pong, paddle_commands)
-    
+
     def __handle_ingoing_messages(self):
         try:
             max_retries = 3

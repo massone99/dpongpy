@@ -23,14 +23,14 @@ class ControlEvent(Enum):
     @classmethod
     def is_control_event(cls, event: pygame.event.Event) -> bool:
         return any(control_event.matches(event) for control_event in cls.all())
-    
+
     @classmethod
     def by_value(cls, value: int) -> 'ControlEvent':
         for control_event in cls.all():
             if control_event.value == value:
                 return control_event
         raise KeyError(f"{cls.__name__} with value {value} not found")
-    
+
     def matches(self, event) -> bool:
         if isinstance(event, pygame.event.Event):
             return event.type == self.value
@@ -67,6 +67,9 @@ class PlayerAction(Enum):
 
 @dataclass(frozen=True)
 class ActionMap:
+    '''
+    A mapping of keys to actions.
+    '''
     move_up: int
     move_down: int
     move_left: int
@@ -112,7 +115,7 @@ def create_event(event: pygame.event.Event | ControlEvent, **kwargs):
 
 
 def post_event(event: pygame.event.Event | ControlEvent, **kwargs):
-    event = create_event(event, **kwargs)    
+    event = create_event(event, **kwargs)
     pygame.event.post(event)
     return event
 

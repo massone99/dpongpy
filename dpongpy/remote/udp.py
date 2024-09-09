@@ -22,6 +22,17 @@ def udp_socket(bind_to: Address | int = Address.any_local_port()) -> socket.sock
 
 
 def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
+    '''
+    Sends a message to a remote peer over UDP.
+
+    Args:
+        - sock (socket.socket): The socket to use for sending.
+        - address (Address): The address of the remote peer.
+        - payload (bytes | str): The message to send.
+
+    Returns:
+        - int: The number of bytes sent.
+    '''
     try:
         if sock._closed:
             raise OSError("Socket is closed")
@@ -42,6 +53,16 @@ def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
 
 
 def udp_receive(sock: socket.socket, decode=True) -> tuple[str | bytes, Address]:
+    '''
+    Receives a message from a remote peer over UDP.
+
+    Args:
+        - sock (socket.socket): The socket to use for receiving.
+        - decode (bool): Whether to decode the payload from bytes to a string.
+
+    Returns:
+        - tuple[str | bytes, Address]: The payload and the address of the remote peer.
+    '''
     try:
         if sock._closed:
             return None, None
@@ -59,6 +80,17 @@ def udp_receive(sock: socket.socket, decode=True) -> tuple[str | bytes, Address]
 
 
 class Session(Session):
+    """
+    Represents a UDP session with a remote peer.
+
+    This class manages communication over UDP with a specific remote address,
+    handling sending and receiving of messages.
+
+    Attributes:
+        - remote_address (Address): The address of the remote peer.
+        - local_address (Address): The local socket address.
+
+    """
     def __init__(self,
                  socket: socket.socket,
                  remote_address: Address | tuple,
@@ -79,6 +111,15 @@ class Session(Session):
         return Address(*self._socket.getsockname())
 
     def send(self, payload: bytes | str):
+        '''
+        Sends a message to the remote peer.
+
+        Args:
+            payload (bytes | str): The message to send.
+
+        Returns:
+            int: The number of bytes sent.
+        '''
         return udp_send(self._socket, self.remote_address, payload)
 
     def receive(self, decode=True):
@@ -95,7 +136,7 @@ class Session(Session):
             assert address.equivalent_to(self.remote_address), f"Received packet from unexpected party {address}"
             return payload
         return None
-    
+
     def close(self):
         self._socket.close()
 
