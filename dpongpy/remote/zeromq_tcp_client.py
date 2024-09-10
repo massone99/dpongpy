@@ -1,44 +1,80 @@
 import random
 import string
+import socket
 import zmq
+import threading
+import queue
 
 class ZeroMQClient:
     def __init__(self, server_address):
-        # Create a ZeroMQ context
         self.context = zmq.Context()
-        # Create a DEALER socket
         self.socket = self.context.socket(zmq.DEALER)
-        # Set a random identity for this client
-        self.identity = f"client-{''.join(random.choices(string.ascii_lowercase + string.digits, k=8))}"
+        self.ip = socket.gethostbyname(socket.gethostname())
+        self.port = self.socket.bind_to_random_port("tcp://*")
+        self.identity = f"{self.ip}:{self.port}"
         self.socket.setsockopt(zmq.IDENTITY, self.identity.encode('utf-8'))
-        # Connect the socket to the server
         self.socket.connect(server_address)
 
+        self.running = False
+        self.receive_thread = None
+        self.message_queue = queue.Queue()
+
+    def start(self):
+        self.running = True
+        self.receive_thread = threading.Thread(target=self._receive_loop)
+        self.receive_thread.start()
+
+    def stop(self):
+        self.running = False
+        if self.receive_thread:
+            self.receive_thread.join()
+        self.close()
+
     def send(self, message):
-        # Send the message to the server
         self.socket.send_multipart([b'', message.encode('utf-8')])
 
-    def receive(self):
-        # Receive the server's reply
-        _, reply = self.socket.recv_multipart()
-        return reply.decode('utf-8')
+    def _receive_loop(self):
+        while self.running:
+            try:
+                identity, reply = self.socket.recv_multipart(flags=zmq.NOBLOCK)
+                message = reply.decode('utf-8')
+                if message == "_quit_":
+                    print("Received quit message from server.")
+                    self.running = False
+                else:
+                    self.message_queue.put(message)
+            except zmq.Again:
+                pass  # No message available
+            except Exception as e:
+                print(f"Error in receive loop: {e}")
+
+    def get_message(self, timeout=None):
+        try:
+            return self.message_queue.get(timeout=timeout)
+        except queue.Empty:
+            return None
 
     def close(self):
         self.socket.close()
         self.context.term()
 
-# Example usage
 
 client = ZeroMQClient("tcp://localhost:5555")
+client.start()
 
-# Send a message to the server
-print("Sending message to server...")
-client.send("Hello, Server!")
-print("Message sent.")
+try:
+    while client.running:
+        message = input("Enter message to send (or 'quit' to exit): ")
+        if message.lower() == 'quit':
+            client.stop()
+            break
+        client.send(message)
 
-# Receive a reply from the server
-reply = client.receive()
-print(f"Received reply from server: {reply}")
-
-# Clean up
-client.close()
+        # Check for received messages
+        received = client.get_message(timeout=0.1)
+        if received:
+            print(f"Received: {received}")
+except KeyboardInterrupt:
+    print("Interrupted by user")
+finally:
+    client.stop()
