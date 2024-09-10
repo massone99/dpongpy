@@ -2,14 +2,17 @@ import threading
 from typing import Optional, Tuple
 
 import zmq
+import socket
 
 
 class ZeroMQServer:
     def __init__(self, port: int):
         self.port = port
+        self.ip = socket.gethostbyname(socket.gethostname())
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.ROUTER)
         self.socket.bind(f"tcp://*:{self.port}")
+        self.identity = f"{self.ip}:{self.port}"
         self.running = False
         self.receive_thread = None
         self.peers = set()
@@ -26,9 +29,15 @@ class ZeroMQServer:
         self.close()
 
     def send(self, message: str, client_id: str):
-        self.socket.send_multipart(
-            [client_id.encode("utf-8"), b"", message.encode("utf-8")]
-        )
+        # The first frame in a message sent through a ROUTER socket is always interpreted
+        # as the destination identity (in this case, the client_id).
+        # BEWARE: The receiver will only receive three parts because the first part is used just for routing.
+        self.socket.send_multipart([
+            client_id.encode("utf-8"),
+            b"",
+            self.identity.encode("utf-8"),
+            message.encode("utf-8")
+        ])
 
     def receive(self) -> Tuple[Optional[str], Optional[str]]:
         try:
@@ -49,7 +58,7 @@ class ZeroMQServer:
             if message is not None:
                 if client_id not in self.peers:
                     self.peers.add(client_id)
-                    print(f"New client connected: {client_id}")
+                    print(f"\033[1mNew client connected: {client_id}\033[0m")
                 print(f"Received message from ({client_id}): {message}")
                 self.handle_message(message, client_id)
 

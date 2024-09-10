@@ -8,6 +8,8 @@ from dpongpy.controller import ControlEvent
 from dpongpy.model import *
 from dpongpy.remote.presentation import deserialize, serialize
 from dpongpy.remote.udp import Client, Server
+from aioquic.tls import Direction
+from dpongpy.log import logger
 
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12345
@@ -120,7 +122,7 @@ class PongCoordinator(PongGame):
                     assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
                     pygame.event.post(message)
                 elif self.running:
-                    logger.warn(f"Receive operation returned None: the server may have been closed ahead of time")
+                    logger.warn("Receive operation returned None: the server may have been closed ahead of time")
                     max_retries -= 1
                     if max_retries == 0: break
         except Exception as e:
@@ -187,7 +189,7 @@ class PongTerminal(PongGame):
                     assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
                     pygame.event.post(message)
                 elif self.running:
-                    logger.warn(f"Receive operation returned None: the client may have been closed ahead of time")
+                    logger.warn("Receive operation returned None: the client may have been closed ahead of time")
                     max_retries -= 1
                     if max_retries == 0: break
         except Exception as e:

@@ -33,20 +33,25 @@ class ZeroMQClient:
     def send(self, message):
         self.socket.send_multipart([b"", message.encode("utf-8")])
 
-    def handle_message(self, message):
+    def handle_message(self, sender, message):
         self.message_queue.put(message)
-        print(f"Received: {message}")
+        print(f"[{sender}] Received: {message}")
 
     def _receive_loop(self):
         while self.running:
             try:
-                _, reply = self.socket.recv_multipart(flags=zmq.NOBLOCK)
-                message = reply.decode("utf-8")
-                if message == "_quit_":
-                    print("Received quit message from server.")
-                    self.running = False
+                multiparts = self.socket.recv_multipart(flags=zmq.NOBLOCK)
+                if len(multiparts) == 3:
+                    _, server_id, payload = multiparts[0], multiparts[1], multiparts[2]
+                    server_id = server_id.decode("utf-8")
+                    message = payload.decode("utf-8")
+                    if message == "_quit_":
+                        print("Received quit message from server.")
+                        self.running = False
+                    else:
+                        self.handle_message(server_id, message)
                 else:
-                    self.handle_message(message)
+                    print(f"Unexpected message format: {multiparts}")
             except zmq.Again:
                 pass  # No message available
             except Exception as e:
@@ -67,8 +72,9 @@ client = ZeroMQClient("tcp://localhost:5555")
 client.start()
 
 try:
+    print("Enter message to send (or 'quit' to exit):\n ")
     while client.running:
-        message = input("Enter message to send (or 'quit' to exit):\n ")
+        message = input()
         if message.lower() == "quit":
             client.stop()
             break
