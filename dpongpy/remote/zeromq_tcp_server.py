@@ -1,6 +1,8 @@
-from typing import Optional, Tuple
-import zmq
 import threading
+from typing import Optional, Tuple
+
+import zmq
+
 
 class ZeroMQServer:
     def __init__(self, port: int):
@@ -24,7 +26,9 @@ class ZeroMQServer:
         self.close()
 
     def send(self, message: str, client_id: str):
-        self.socket.send_multipart([client_id.encode('utf-8'), b'', message.encode('utf-8')])
+        self.socket.send_multipart(
+            [client_id.encode("utf-8"), b"", message.encode("utf-8")]
+        )
 
     def receive(self) -> Tuple[Optional[str], Optional[str]]:
         try:
@@ -32,7 +36,7 @@ class ZeroMQServer:
             if len(message_parts) < 3:
                 return None, None
             client_id, delimiter, payload = message_parts
-            return payload.decode('utf-8'), client_id.decode('utf-8')
+            return payload.decode("utf-8"), client_id.decode("utf-8")
         except zmq.Again:
             return None, None
         except Exception as e:
@@ -51,11 +55,11 @@ class ZeroMQServer:
 
     def handle_message(self, message: str, client_id):
         # Example message handling
-        response = f"Server received: {message}"
+        response = f"<<Server received: {message}>>"
         self.send(response, client_id)
 
         # Check for quit message
-        if message.lower() == 'quit':
+        if message.lower() == "quit":
             self.send("_quit_", client_id)
             self.peers.remove(client_id)
             print(f"Client disconnected: {client_id}")
@@ -65,8 +69,10 @@ class ZeroMQServer:
         self.context.term()
 
     def broadcast(self, message: str):
+        # this does not work as long as the clients are not added to the peers
         for client_id in self.peers:
             self.send(message, client_id)
+
 
 # Example usage
 server = ZeroMQServer(5555)
@@ -74,8 +80,9 @@ server.start()
 
 try:
     while True:
-        msg = input("Enter a message to broadcast (or 'quit' to stop the server): \n")
-        if msg.lower() == 'quit':
+        msg = input(
+            "Enter a message to broadcast (or 'quit' to stop the server): \n")
+        if msg.lower() == "quit":
             break
         server.broadcast(msg)
 except KeyboardInterrupt:

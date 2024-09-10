@@ -1,9 +1,9 @@
-import random
-import string
-import socket
-import zmq
-import threading
 import queue
+import socket
+import threading
+
+import zmq
+
 
 class ZeroMQClient:
     def __init__(self, server_address):
@@ -12,7 +12,7 @@ class ZeroMQClient:
         self.ip = socket.gethostbyname(socket.gethostname())
         self.port = self.socket.bind_to_random_port("tcp://*")
         self.identity = f"{self.ip}:{self.port}"
-        self.socket.setsockopt(zmq.IDENTITY, self.identity.encode('utf-8'))
+        self.socket.setsockopt(zmq.IDENTITY, self.identity.encode("utf-8"))
         self.socket.connect(server_address)
 
         self.running = False
@@ -31,18 +31,22 @@ class ZeroMQClient:
         self.close()
 
     def send(self, message):
-        self.socket.send_multipart([b'', message.encode('utf-8')])
+        self.socket.send_multipart([b"", message.encode("utf-8")])
+
+    def handle_message(self, message):
+        self.message_queue.put(message)
+        print(f"Received: {message}")
 
     def _receive_loop(self):
         while self.running:
             try:
-                identity, reply = self.socket.recv_multipart(flags=zmq.NOBLOCK)
-                message = reply.decode('utf-8')
+                _, reply = self.socket.recv_multipart(flags=zmq.NOBLOCK)
+                message = reply.decode("utf-8")
                 if message == "_quit_":
                     print("Received quit message from server.")
                     self.running = False
                 else:
-                    self.message_queue.put(message)
+                    self.handle_message(message)
             except zmq.Again:
                 pass  # No message available
             except Exception as e:
@@ -64,16 +68,12 @@ client.start()
 
 try:
     while client.running:
-        message = input("Enter message to send (or 'quit' to exit): ")
-        if message.lower() == 'quit':
+        message = input("Enter message to send (or 'quit' to exit):\n ")
+        if message.lower() == "quit":
             client.stop()
             break
         client.send(message)
 
-        # Check for received messages
-        received = client.get_message(timeout=0.1)
-        if received:
-            print(f"Received: {received}")
 except KeyboardInterrupt:
     print("Interrupted by user")
 finally:
