@@ -6,6 +6,8 @@ import socket
 
 
 class ZeroMQServer:
+    shutdown_message = "quit"
+
     def __init__(self, port: int):
         self.port = port
         self.ip = socket.gethostbyname(socket.gethostname())
@@ -89,11 +91,10 @@ server.start()
 
 try:
     while True:
-        msg = input(
-            "Enter a message to broadcast (or 'quit' to stop the server): \n")
-        if msg.lower() == "quit":
-            break
+        msg = input("Enter a message to broadcast (or 'quit' to stop the server): \n")
         server.broadcast(msg)
+        if msg.lower() == ZeroMQServer.shutdown_message:
+            break
 except KeyboardInterrupt:
     print("Server interrupted")
 finally:
