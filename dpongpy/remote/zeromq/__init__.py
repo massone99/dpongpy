@@ -8,7 +8,7 @@ from dpongpy.controller import ControlEvent
 from dpongpy.log import logger
 from dpongpy.model import *
 from dpongpy.remote.presentation import deserialize, serialize
-from dpongpy.remote.zmq_impl import Server, Client
+from dpongpy.remote.zmq_tcp import Server, Client
 
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12345
