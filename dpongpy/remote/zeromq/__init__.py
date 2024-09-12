@@ -5,10 +5,10 @@ from pygame.event import Event
 
 from dpongpy import PongGame, Settings
 from dpongpy.controller import ControlEvent
+from dpongpy.log import logger
 from dpongpy.model import *
 from dpongpy.remote.presentation import deserialize, serialize
-from dpongpy.remote.udp import Client, Server
-from dpongpy.log import logger
+from dpongpy.remote.zmq_impl import Server, Client
 
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12345
@@ -30,6 +30,7 @@ class PongCoordinator(PongGame):
         self.pong.reset_ball((0, 0))
         # TODO: this is where the usage of ZeroMQ should be introduced
         # since the Server implementation is where UDP is used
+        print("self.settings.port or DEFAULT_PORT: ", self.settings.port or DEFAULT_PORT)
         self.server = Server(self.settings.port or DEFAULT_PORT)
         self._thread_receiver = threading.Thread(target=self.__handle_ingoing_messages, daemon=True)
         self._thread_receiver.start()
@@ -108,15 +109,17 @@ class PongCoordinator(PongGame):
     def _broadcast_to_all_peers(self, message):
         event = serialize(message)
         for peer in self.peers:
-            self.server.send(payload=event, address=peer)
+            self.server.send(peer, event)
 
     def __handle_ingoing_messages(self):
         try:
             max_retries = 3
             while self.running:
                 message, sender = self.server.receive()
+                print("Message received by coordinator: ", message)
                 if sender is not None:
                     self.add_peer(sender)
+                    print(f"Added peer: {sender}")
                     message = deserialize(message)
                     assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
                     pygame.event.post(message)
@@ -127,7 +130,6 @@ class PongCoordinator(PongGame):
         except Exception as e:
             self.running = False
             raise e
-
 
 
 class PongTerminal(PongGame):
@@ -183,6 +185,7 @@ class PongTerminal(PongGame):
             max_retries = 3
             while self.running:
                 message = self.client.receive()
+                print("Msg received by terminal: ", message)
                 if message is not None:
                     message = deserialize(message)
                     assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
@@ -198,6 +201,7 @@ class PongTerminal(PongGame):
     def before_run(self):
         logger.info("Terminal starting")
         super().before_run()
+        print("Joining the game")
         self.controller.post_event(ControlEvent.PLAYER_JOIN, paddle_index=self.pong.paddles[0].side)
 
     def after_run(self):
@@ -208,7 +212,6 @@ class PongTerminal(PongGame):
 
 def main_coordinator(settings = None):
     PongCoordinator(settings).run()
-
 
 def main_terminal(settings = None):
     PongTerminal(settings).run()
