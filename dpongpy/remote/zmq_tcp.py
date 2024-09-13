@@ -1,9 +1,9 @@
-import threading
-from typing import Optional, Tuple
-import zmq
-from dpongpy.remote import Address, Server, Session
 import binascii
-import threading
+from typing import Optional, Tuple
+
+import zmq
+
+from dpongpy.remote import Address, Server, Session
 
 
 class ZeroMQSession(Session):
@@ -60,6 +60,7 @@ class Client(ZeroMQSession):
     """
     A ZeroMQ client that connects to a server using the DEALER pattern.
     This class manages communication with the remote ZeroMQ server.
+    Applies the DEALER pattern.
     """
 
     def __init__(self, remote_address: Address):
@@ -76,7 +77,7 @@ class Client(ZeroMQSession):
 class Server(Server):
     """
     A simple ZeroMQ server that listens for incoming messages
-    and manages sessions with clients.
+    and manages sessions with clients. Applies the ROUTER pattern.
     """
 
     def __init__(self, port: int):
@@ -143,9 +144,7 @@ class Server(Server):
             client_id_bytes = binascii.unhexlify(client_id)
             self.socket.send_multipart([client_id_bytes, payload.encode("utf-8")])
         else:
-            print(
-                f"[Server] Client {client_id} not found in the list: {list(self.sessions.keys())}"
-            )
+            logger.debug(f"Client {client_id} not found in sessions")
 
     def close(self):
         """
@@ -161,19 +160,3 @@ class Server(Server):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
-
-
-# Example usage with context management
-# with ZeroMQServer(5555) as server:
-#     try:
-#         while True:
-#             msg = input(
-#                 "Enter a message to broadcast (or 'quit' to stop the server): \n"
-#             )
-#             server.broadcast(msg)
-#             if msg.lower() == ZeroMQServer.shutdown_message:
-#                 break
-#     except KeyboardInterrupt:
-#         print("Server interrupted")
-#     finally:
-#         print("Server stopped")
