@@ -22,9 +22,9 @@ class ZeroMQSession(Session):
 
     @property
     def remote_address(self) -> Address:
-        '''
+        """
         Represents the address of the remote peer.
-        '''
+        """
         return self._remote_address
 
     @property
@@ -43,8 +43,6 @@ class ZeroMQSession(Session):
                 payload = payload.decode()
             self._first_message = None
             return payload
-        print("Trying to receive from", self.remote_address)
-        # payload, address = self._socket.recv()
         payload = self._socket.recv()
         return payload
 
@@ -70,17 +68,21 @@ class Client(ZeroMQSession):
         self.connect()
 
     def connect(self):
-        self._socket.connect(f"tcp://{self._remote_address[0]}:{self._remote_address[1]}")
+        self._socket.connect(
+            f"tcp://{self._remote_address[0]}:{self._remote_address[1]}"
+        )
+
 
 class Server(Server):
     """
     A simple ZeroMQ server that listens for incoming messages
     and manages sessions with clients.
     """
+
     def __init__(self, port: int):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.ROUTER)
-        self.socket.bind(f"tcp://127.0.0.1:{port}")  # Bind to localhost
+        self.socket.bind(f"tcp://localhost:{port}")
         endpoint = self.socket.getsockopt_string(zmq.LAST_ENDPOINT)
         ip = endpoint.split("://")[1].split(":")[0]
         print(f"Server listening on IP: {ip}, Port: {port}")
@@ -119,12 +121,14 @@ class Server(Server):
                 return None, None
 
             client_id, message = message_parts
-            client_id_hex = binascii.hexlify(client_id).decode('ascii')
+            client_id_hex = binascii.hexlify(client_id).decode("ascii")
 
             # Create a new session if this is a new client
             if client_id_hex not in self.sessions:
                 print(f"New client connected: {client_id_hex}")
-                session = ZeroMQSession(self.socket, Address("", 0), None)  # Placeholder address
+                session = ZeroMQSession(
+                    self.socket, Address("", 0), None
+                )  # Placeholder address
                 self.sessions[client_id_hex] = session
 
             return message.decode("utf-8"), client_id_hex
@@ -139,7 +143,9 @@ class Server(Server):
             client_id_bytes = binascii.unhexlify(client_id)
             self.socket.send_multipart([client_id_bytes, payload.encode("utf-8")])
         else:
-            print(f"[Server] Client {client_id} not found in the list: {list(self.sessions.keys())}")
+            print(
+                f"[Server] Client {client_id} not found in the list: {list(self.sessions.keys())}"
+            )
 
     def close(self):
         """

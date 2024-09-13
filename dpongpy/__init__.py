@@ -13,10 +13,8 @@ class Settings:
     fps: int = 60
     host: Optional[str] = None
     port: Optional[int] = None
-    # i guess they are the lines in which each of the paddles can move
-    # LEFT refers to the left side of the screen and RIGHT to the right one
     initial_paddles: tuple[Direction, Direction] = (Direction.LEFT, Direction.RIGHT)
-
+    comm_technology: str = "zmq"
 
 class PongGame:
     def __init__(self, settings: Settings = None):

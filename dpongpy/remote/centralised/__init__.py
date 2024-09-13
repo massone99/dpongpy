@@ -7,7 +7,6 @@ from dpongpy import PongGame, Settings
 from dpongpy.controller import ControlEvent
 from dpongpy.model import *
 from dpongpy.remote.presentation import deserialize, serialize
-from dpongpy.remote.udp import Client, Server
 from dpongpy.log import logger
 
 DEFAULT_HOST = "localhost"
@@ -15,23 +14,35 @@ DEFAULT_PORT = 12345
 
 
 class PongCoordinator(PongGame):
-    '''
+    """
     A PongGame that acts as the central server/coordinator for the game.
     It:
         - Initializes a server to handle communication with terminals.
         - Manages the game state and broadcasts updates to all connected terminals.
         - Handles incoming messages from terminals in a separate thread.
-    '''
+    """
 
     def __init__(self, settings: Settings = None):
         settings = settings or Settings()
         settings.initial_paddles = []
         super().__init__(settings)
         self.pong.reset_ball((0, 0))
-        # TODO: this is where the usage of ZeroMQ should be introduced
-        # since the Server implementation is where UDP is used
+        if settings.comm_technology == "zmq":
+            logger.info(
+                f"[{self.__class__.__name__}] Using ZeroMQ as the communication technology"
+            )
+            from dpongpy.remote.zeromq import Server
+        elif settings.comm_technology == "udp":
+            logger.info(
+                f"[{self.__class__.__name__}] Using UDP as the communication technology"
+            )
+            from dpongpy.remote.udp import Server
+        else:
+            raise ValueError("Invalid comm_technology. Must be either 'zmq' or 'udp'.")
         self.server = Server(self.settings.port or DEFAULT_PORT)
-        self._thread_receiver = threading.Thread(target=self.__handle_ingoing_messages, daemon=True)
+        self._thread_receiver = threading.Thread(
+            target=self.__handle_ingoing_messages, daemon=True
+        )
         self._thread_receiver.start()
         self._peers = set()
         self._lock = threading.RLock()
@@ -42,7 +53,9 @@ class PongCoordinator(PongGame):
 
         class SendToPeersPongView(ShowNothingPongView):
             def render(self):
-                event = coordinator.controller.create_event(ControlEvent.TIME_ELAPSED, dt=coordinator.dt, status=self._pong)
+                event = coordinator.controller.create_event(
+                    ControlEvent.TIME_ELAPSED, dt=coordinator.dt, status=self._pong
+                )
                 coordinator._broadcast_to_all_peers(event)
 
         return SendToPeersPongView(coordinator.pong)
@@ -108,7 +121,7 @@ class PongCoordinator(PongGame):
     def _broadcast_to_all_peers(self, message):
         event = serialize(message)
         for peer in self.peers:
-            self.server.send(payload=event, address=peer)
+            self.server.send(client_id=peer, payload=event)
 
     def __handle_ingoing_messages(self):
         try:
@@ -118,37 +131,59 @@ class PongCoordinator(PongGame):
                 if sender is not None:
                     self.add_peer(sender)
                     message = deserialize(message)
-                    assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+                    assert isinstance(
+                        message, pygame.event.Event
+                    ), f"Expected {pygame.event.Event}, got {type(message)}"
                     pygame.event.post(message)
                 elif self.running:
-                    logger.warn("Receive operation returned None: the server may have been closed ahead of time")
+                    logger.warn(
+                        "Receive operation returned None: the server may have been closed ahead of time"
+                    )
                     max_retries -= 1
-                    if max_retries == 0: break
+                    if max_retries == 0:
+                        break
         except Exception as e:
             self.running = False
             raise e
 
 
-
 class PongTerminal(PongGame):
-    '''
+    """
     A PongGame that runs in terminal mode, i.e. it is controlled by the user.
     It:
     - Connects to the coordinator as a client.
     - Handles local player input and sends it to the coordinator.
     - Receives game state updates from the coordinator and updates the local game state.
-    '''
+    """
 
     def __init__(self, settings: Settings = None):
         settings = settings or Settings()
-        assert len(settings.initial_paddles) == 1, "Only one paddle is allowed in terminal mode"
+        assert (
+            len(settings.initial_paddles) == 1
+        ), "Only one paddle is allowed in terminal mode"
         super().__init__(settings)
         self.pong.reset_ball((0, 0))
-        self.client = Client((self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
-        self._thread_receiver = threading.Thread(target=self.__handle_ingoing_messages, daemon=True)
+        if settings.comm_technology == "zmq":
+            logger.info(
+                f"[{self.__class__.__name__}] Using ZeroMQ as the communication technology"
+            )
+            from dpongpy.remote.zeromq import Client
+        elif settings.comm_technology == "udp":
+            logger.info(
+                f"[{self.__class__.__name__}] Using UDP as the communication technology"
+            )
+            from dpongpy.remote.udp import Client
+        else:
+            raise ValueError("Invalid comm_technology. Must be either 'zmq' or 'udp'.")
+        self.client = Client(
+            (self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT)
+        )
+        self._thread_receiver = threading.Thread(
+            target=self.__handle_ingoing_messages, daemon=True
+        )
         self._thread_receiver.start()
 
-    def create_controller(terminal, paddle_commands = None):
+    def create_controller(terminal, paddle_commands=None):
         from dpongpy.controller.local import EventHandler, PongInputHandler
 
         class Controller(PongInputHandler, EventHandler):
@@ -170,7 +205,9 @@ class PongTerminal(PongGame):
                 else:
                     pong.override(status)
 
-            def on_paddle_move(self, pong: Pong, paddle_index: int | Direction, direction: Direction):
+            def on_paddle_move(
+                self, pong: Pong, paddle_index: int | Direction, direction: Direction
+            ):
                 pong.move_paddle(paddle_index, direction)
 
             def on_game_over(self, pong: Pong):
@@ -185,12 +222,17 @@ class PongTerminal(PongGame):
                 message = self.client.receive()
                 if message is not None:
                     message = deserialize(message)
-                    assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+                    assert isinstance(
+                        message, pygame.event.Event
+                    ), f"Expected {pygame.event.Event}, got {type(message)}"
                     pygame.event.post(message)
                 elif self.running:
-                    logger.warn("Receive operation returned None: the client may have been closed ahead of time")
+                    logger.warn(
+                        "Receive operation returned None: the client may have been closed ahead of time"
+                    )
                     max_retries -= 1
-                    if max_retries == 0: break
+                    if max_retries == 0:
+                        break
         except Exception as e:
             self.running = False
             raise e
@@ -198,7 +240,9 @@ class PongTerminal(PongGame):
     def before_run(self):
         logger.info("Terminal starting")
         super().before_run()
-        self.controller.post_event(ControlEvent.PLAYER_JOIN, paddle_index=self.pong.paddles[0].side)
+        self.controller.post_event(
+            ControlEvent.PLAYER_JOIN, paddle_index=self.pong.paddles[0].side
+        )
 
     def after_run(self):
         self.client.close()
@@ -206,9 +250,9 @@ class PongTerminal(PongGame):
         super().after_run()
 
 
-def main_coordinator(settings = None):
+def main_coordinator(settings=None):
     PongCoordinator(settings).run()
 
 
-def main_terminal(settings = None):
+def main_terminal(settings=None):
     PongTerminal(settings).run()

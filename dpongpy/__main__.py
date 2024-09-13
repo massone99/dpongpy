@@ -1,8 +1,6 @@
 import dpongpy.model
 import dpongpy.controller
-from dpongpy.remote import zeromq
 import argparse
-
 
 def arg_parser():
     ap = argparse.ArgumentParser()
@@ -14,6 +12,13 @@ def arg_parser():
         "-m",
         choices=["local", "centralised"],
         help="Run the game in local or centralised mode",
+    )
+    mode.add_argument(
+        "--comm-type",
+        "-c",
+        choices=["udp", "zmq"],
+        required=False,
+        help="Specify the communication type (UDP or ZeroMQ) for centralised mode",
     )
     mode.add_argument(
         "--role",
@@ -47,8 +52,7 @@ def arg_parser():
         action="append",
         default=None,
     )
-    game.add_argument(
-        "--debug", "-d", help="Enable debug mode", action="store_true")
+    game.add_argument("--debug", "-d", help="Enable debug mode", action="store_true")
     game.add_argument(
         "--size",
         "-S",
@@ -57,8 +61,7 @@ def arg_parser():
         nargs=2,
         default=[900, 600],
     )
-    game.add_argument("--fps", "-f", help="Frames per second",
-                      type=int, default=60)
+    game.add_argument("--fps", "-f", help="Frames per second", type=int, default=60)
     return ap
 
 
@@ -73,8 +76,7 @@ def args_to_settings(args):
         args.keys = list(dpongpy.controller.ActionMap.all_mappings().keys())[
             : len(args.sides)
         ]
-    assert len(args.sides) == len(
-        args.keys), "Number of sides and keymaps must match"
+    assert len(args.sides) == len(args.keys), "Number of sides and keymaps must match"
     settings.initial_paddles = {
         dpongpy.model.Direction[
             direction.upper()
@@ -99,18 +101,15 @@ if args.mode == "local":
     dpongpy.main(settings)
     exit(0)
 if args.mode == "centralised":
-    # the package remote is all about the distributed version of the game
     import dpongpy.remote.centralised
 
     if args.role == "coordinator":
-        dpongpy.remote.zeromq.main_coordinator(settings)
-        # dpongpy.remote.centralised.main_coordinator(settings)
+        dpongpy.remote.centralised.main_coordinator(settings)
         exit(0)
     if args.role == "terminal":
-        dpongpy.remote.zeromq.main_terminal(settings)
-        # dpongpy.remote.centralised.main_terminal(settings)
+        dpongpy.remote.centralised.main_terminal(settings)
         exit(0)
-    print(
-        f"Invalid role: {args.role}. Must be either 'coordinator' or 'terminal'")
+    print(f"Invalid role: {args.role}. Must be either 'coordinator' or 'terminal'")
+
 parser.print_help()
 exit(1)
