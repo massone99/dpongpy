@@ -31,7 +31,7 @@ class PongCoordinator(PongGame):
             logger.info(
                 f"[{self.__class__.__name__}] Using ZeroMQ as the communication technology"
             )
-            from dpongpy.remote.zeromq import Server
+            from dpongpy.remote.zmq_tcp import Server
         elif settings.comm_technology == "udp":
             logger.info(
                 f"[{self.__class__.__name__}] Using UDP as the communication technology"
@@ -167,7 +167,7 @@ class PongTerminal(PongGame):
             logger.info(
                 f"[{self.__class__.__name__}] Using ZeroMQ as the communication technology"
             )
-            from dpongpy.remote.zeromq import Client
+            from dpongpy.remote.zmq_tcp import Client
         elif settings.comm_technology == "udp":
             logger.info(
                 f"[{self.__class__.__name__}] Using UDP as the communication technology"
