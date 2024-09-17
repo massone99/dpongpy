@@ -2,7 +2,7 @@ import threading
 
 import pygame
 from pygame.event import Event
-
+import asyncio
 from dpongpy import PongGame, Settings
 from dpongpy.controller import ControlEvent
 from dpongpy.model import *
@@ -11,6 +11,11 @@ from dpongpy.log import logger
 
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12345
+
+
+def _run_event_loop_in_thread(loop):
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
 
 
 class PongCoordinator(PongGame):
@@ -27,23 +32,94 @@ class PongCoordinator(PongGame):
         settings.initial_paddles = []
         super().__init__(settings)
         self.pong.reset_ball((0, 0))
-        if settings.comm_technology == "zmq":
-            logger.info(
-                f"[{self.__class__.__name__}] Using ZeroMQ as the communication technology"
+        self.communication_technology = settings.comm_technology
+        match self.communication_technology:
+            case "zmq":
+                self.prepare_server_zmq()
+            case "udp":
+                self.prepare_server_udp()
+            case "web_sockets":
+                self.prepare_server_web_sockets()
+            case _:
+                raise ValueError(
+                    f"Invalid communication technology: {self.communication_technology}"
+                )
+
+    async def _handle_ingoing_messages_async(self):
+        assert self.running, "Server is not running"
+        while self.running:
+            logger.debug(
+                f"[{self.__class__.__name__}] Waiting for incoming messages..."
             )
-            from dpongpy.remote.zmq_tcp import Server
-        elif settings.comm_technology == "udp":
-            logger.info(
-                f"[{self.__class__.__name__}] Using UDP as the communication technology"
+            sender, message = await self.server.receive()
+            logger.debug(
+                f"[{self.__class__.__name__}] Received message from {sender}: {message}"
             )
-            from dpongpy.remote.udp import Server
-        else:
-            raise ValueError("Invalid comm_technology. Must be either 'zmq' or 'udp'.")
+            if sender is not None:
+                self.add_peer(sender)
+                message = deserialize(message)
+                assert isinstance(
+                    message, pygame.event.Event
+                ), f"Expected {pygame.event.Event}, got {type(message)}"
+                pygame.event.post(message)
+            elif self.running:
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Receive operation returned None"
+                )
+
+    def prepare_server_web_sockets(self):
+        logger.info(
+            f"[{self.__class__.__name__}] Using WebSockets as the communication technology"
+        )
+        from dpongpy.remote.web_sockets.server import Server
+
         self.server = Server(self.settings.port or DEFAULT_PORT)
-        self._thread_receiver = threading.Thread(
+
+        # Create a new event loop for the WebSocket server
+        self.event_loop = asyncio.new_event_loop()
+
+        # Start the server in a new thread
+        self._event_loop_thread = threading.Thread(
+            target=_run_event_loop_in_thread, args=(self.event_loop,), daemon=True
+        )
+        self._event_loop_thread.start()
+
+        self._peers = set()
+        self._lock = threading.RLock()
+
+        # Start the server asynchronously in the event loop
+        asyncio.run_coroutine_threadsafe(self.server.start(), self.event_loop)
+
+        # Start handling incoming messages asynchronously
+        asyncio.run_coroutine_threadsafe(
+            self._handle_ingoing_messages_async(), self.event_loop
+        )
+
+    def prepare_server_udp(self):
+        logger.info(
+            f"[{self.__class__.__name__}] Using UDP as the communication technology"
+        )
+        from dpongpy.remote.udp import Server
+
+        self.server = Server(self.settings.port or DEFAULT_PORT)
+        self._event_loop_thread = threading.Thread(
             target=self.__handle_ingoing_messages, daemon=True
         )
-        self._thread_receiver.start()
+        self._event_loop_thread.start()
+        self._peers = set()
+        self._lock = threading.RLock()
+
+    def prepare_server_zmq(self):
+        logger.info(
+            f"[{self.__class__.__name__}] Using ZeroMQ as the communication technology"
+        )
+        from dpongpy.remote.zmq_tcp import Server
+
+        self.server = Server(self.settings.port or DEFAULT_PORT)
+        self._event_loop_thread = threading.Thread(
+            target=self.__handle_ingoing_messages, daemon=True
+        )
+        self._event_loop_thread.start()
         self._peers = set()
         self._lock = threading.RLock()
 
@@ -121,7 +197,13 @@ class PongCoordinator(PongGame):
     def _broadcast_to_all_peers(self, message):
         event = serialize(message)
         for peer in self.peers:
-            self.server.send(client_id=peer, payload=event)
+            if self.settings.comm_technology == "web_sockets":
+                loop = asyncio.get_event_loop()
+                loop.run_until_complete(
+                    self.server.send(client_socket=peer, payload=event)
+                )
+            else:
+                self.server.send(client_socket=peer, message=event)
 
     def __handle_ingoing_messages(self):
         try:
@@ -163,18 +245,66 @@ class PongTerminal(PongGame):
         ), "Only one paddle is allowed in terminal mode"
         super().__init__(settings)
         self.pong.reset_ball((0, 0))
-        if settings.comm_technology == "zmq":
-            logger.info(
-                f"[{self.__class__.__name__}] Using ZeroMQ as the communication technology"
-            )
-            from dpongpy.remote.zmq_tcp import Client
-        elif settings.comm_technology == "udp":
-            logger.info(
-                f"[{self.__class__.__name__}] Using UDP as the communication technology"
-            )
-            from dpongpy.remote.udp import Client
-        else:
-            raise ValueError("Invalid comm_technology. Must be either 'zmq' or 'udp'.")
+        self.communication_technology = settings.comm_technology
+        match self.communication_technology:
+            case "zmq":
+                self.prepare_client_zmq()
+            case "udp":
+                self.prepare_client_udp
+            case "web_sockets":
+                self.prepare_client_web_sockets()
+            case _:
+                raise ValueError(
+                    f"Invalid communication technology: {self.communication_technology}"
+                )
+
+    async def _handle_ingoing_messages_async(self):
+        assert self.running, "Client is not running"
+        while self.running:
+            message = await self.client.receive()
+            if message is not None:
+                message = deserialize(message)
+                assert isinstance(
+                    message, pygame.event.Event
+                ), f"Expected {pygame.event.Event}, got {type(message)}"
+                pygame.event.post(message)
+            elif self.running:
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Receive operation returned None"
+                )
+
+    def prepare_client_web_sockets(self):
+        logger.info(
+            f"[{self.__class__.__name__}] Using WebSockets as the communication technology"
+        )
+        from dpongpy.remote.web_sockets.session import WebSocketSession
+
+        self.client = WebSocketSession(
+            (self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT)
+        )
+
+        self.event_loop = asyncio.new_event_loop()
+
+        self.event_loop.run_until_complete(self.client.connect())
+
+        self._event_loop_thread = threading.Thread(
+            target=_run_event_loop_in_thread, args=(self.event_loop,), daemon=True
+        )
+
+        self._event_loop_thread.start()
+        self._peers = set()
+        self._lock = threading.RLock()
+
+        asyncio.run_coroutine_threadsafe(
+            self._handle_ingoing_messages_async(), loop=self.event_loop
+        )
+
+    def prepare_client_zmq(self):
+        logger.info(
+            f"[{self.__class__.__name__}] Using ZeroMQ as the communication technology"
+        )
+        from dpongpy.remote.zmq_tcp import Client
+
         self.client = Client(
             (self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT)
         )
@@ -182,6 +312,24 @@ class PongTerminal(PongGame):
             target=self.__handle_ingoing_messages, daemon=True
         )
         self._thread_receiver.start()
+        self._peers = set()
+        self._lock = threading.RLock()
+
+    def prepare_client_udp(self):
+        logger.info(
+            f"[{self.__class__.__name__}] Using UDP as the communication technology"
+        )
+        from dpongpy.remote.udp import Client
+
+        self.client = Client(
+            (self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT)
+        )
+        self._thread_receiver = threading.Thread(
+            target=self.__handle_ingoing_messages, daemon=True
+        )
+        self._thread_receiver.start()
+        self._peers = set()
+        self._lock = threading.RLock()
 
     def create_controller(terminal, paddle_commands=None):
         from dpongpy.controller.local import EventHandler, PongInputHandler
@@ -193,7 +341,12 @@ class PongTerminal(PongGame):
             def post_event(self, event: Event | ControlEvent, **kwargs):
                 event = super().post_event(event, **kwargs)
                 if not ControlEvent.TIME_ELAPSED.matches(event):
-                    terminal.client.send(serialize(event))
+                    assert terminal.client.websocket.open, "Websocket is not open"
+
+                    # terminal.client.send(serialize(event))
+                    loop = asyncio.get_event_loop()
+                    # Execute event on the event loop in a blocking way
+                    loop.run_until_complete(terminal.client.send(serialize(event)))
                 return event
 
             def handle_inputs(self, dt=None):

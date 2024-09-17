@@ -14,7 +14,7 @@ class Settings:
     host: Optional[str] = None
     port: Optional[int] = None
     initial_paddles: tuple[Direction, Direction] = (Direction.LEFT, Direction.RIGHT)
-    comm_technology: str = "zmq"
+    comm_technology: str = "web_sockets"
 
 class PongGame:
     def __init__(self, settings: Settings = None):

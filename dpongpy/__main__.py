@@ -16,7 +16,7 @@ def arg_parser():
     mode.add_argument(
         "--comm-type",
         "-c",
-        choices=["udp", "zmq"],
+        choices=["udp", "zmq", "web_sockets"],
         required=False,
         help="Specify the communication type (UDP or ZeroMQ) for centralised mode",
     )

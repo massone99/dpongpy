@@ -2,7 +2,7 @@ import binascii
 from typing import Optional, Tuple
 
 import zmq
-
+from dpongpy.log import logger
 from dpongpy.remote import Address, Server, Session
 
 
