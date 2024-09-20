@@ -32,7 +32,7 @@ class PongGame:
 
     def create_view(self):
         '''
-        Creates
+        Creates the view for the game.
         '''
         from dpongpy.view import ScreenPongView
         return ScreenPongView(self.pong, debug=self.settings.debug)

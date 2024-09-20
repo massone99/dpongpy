@@ -1,6 +1,10 @@
+import threading
+import time
+import uuid
 import dpongpy.model
 import dpongpy.controller
 import argparse
+
 
 def arg_parser():
     ap = argparse.ArgumentParser()
@@ -17,6 +21,8 @@ def arg_parser():
         "--comm-type",
         "-c",
         choices=["udp", "zmq", "web_sockets"],
+        # FIXME: remove
+        default="web_sockets",
         required=False,
         help="Specify the communication type (UDP or ZeroMQ) for centralised mode",
     )
@@ -33,6 +39,19 @@ def arg_parser():
     )
     networking.add_argument(
         "--port", "-p", help="Port to connect to", type=int, default=None
+    )
+    # Argument added to manage the lobby via REST API before the game starts
+    networking.add_argument(
+        "--api-url",
+        type=str,
+        default="http://localhost",
+        help="URL of the lobby management API",
+    )
+    networking.add_argument(
+        "--api-port",
+        type=int,
+        default=8000,
+        help="Port of the lobby management API",
     )
     game = ap.add_argument_group("game")
     game.add_argument(
@@ -103,12 +122,64 @@ if args.mode == "local":
 if args.mode == "centralised":
     import dpongpy.remote.centralised
 
+    # The coordinators models also the entity which manages the REST API
+    # for managing the lobby, so it must be started without any precondition
     if args.role == "coordinator":
-        dpongpy.remote.centralised.main_coordinator(settings)
-        exit(0)
+        # Check if the comm_type is web_sockets
+        if args.comm_type == "web_sockets":
+            # Start the server to manage the REST API
+            from dpongpy.remote.lobby.lobby_server import app
+            import uvicorn
+
+            api_server_thread = threading.Thread(
+                target=uvicorn.run,
+                kwargs={"app": app, "host": "127.0.0.1", "port": 8000}
+            )
+            api_server_thread.start()
+
+            print("Starting web_sockets coordinator")
+
+            # dpongpy.remote.centralised.main_coordinator(settings)
+            exit(0)
+        else:
+            dpongpy.remote.centralised.main_coordinator(settings)
+            exit(0)
     if args.role == "terminal":
-        dpongpy.remote.centralised.main_terminal(settings)
-        exit(0)
+        # The PongTerminal on the other side can be created only if the lobby is full, to avoid the graphic rendering
+        # of the game UI
+        if args.comm_type == "web_sockets":
+            # Prompt the server to join the lobby using the REST API
+            print("Starting lobby management for client")
+
+            from dpongpy.remote.lobby.lobby_client import LobbyManagerClient
+
+            lobby_manager = LobbyManagerClient(
+                base_url=args.api_url, api_port=args.api_port
+            )
+            print("Lobby API url: ", args.api_url)
+
+            client_name = f"client_{uuid.uuid4().hex[:8]}_{int(time.time())}"
+            print(f"Generated client name: {client_name}")
+
+            print("Connecting to lobby...")
+            response = lobby_manager.join_lobby(client_name)
+
+            # Retrieve the websocket information from the response
+            if response.lobby:
+                settings.host = response.lobby.address
+                settings.port = response.lobby.port
+            else:
+                raise ValueError("No lobby found")
+
+            # if the lobby is full, then create the terminal
+            # if lobby_manager.get_lobby().is_full:
+            #     dpongpy.remote.centralised.main_terminal(settings)
+            exit(0)
+        else:
+            print("NO WEB SOCKETS")
+
+            dpongpy.remote.centralised.main_terminal(settings)
+            exit(0)
     print(f"Invalid role: {args.role}. Must be either 'coordinator' or 'terminal'")
 
 parser.print_help()

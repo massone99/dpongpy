@@ -250,7 +250,7 @@ class PongTerminal(PongGame):
             case "zmq":
                 self.prepare_client_zmq()
             case "udp":
-                self.prepare_client_udp
+                self.prepare_client_udp()
             case "web_sockets":
                 self.prepare_client_web_sockets()
             case _:

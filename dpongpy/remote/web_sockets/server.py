@@ -4,11 +4,17 @@ from typing import Tuple
 from dpongpy.log import logger
 
 class Server:
-    def __init__(self, port: int):
+    def __init__(self, port: int, num_clients: int = 2):
         self.port = port
+        self.num_clients = num_clients
         self.clients = set()  # Store client WebSocket connections
         self.message_queue = asyncio.Queue()
         self.server = None
+        self.lobby_full_event = asyncio.Event()
+
+
+    def is_lobby_full(self) -> bool:
+        return len(self.clients) >= self.num_clients
 
     async def start(self):
         # Start the server and serve clients continuously without a loop
@@ -17,19 +23,23 @@ class Server:
 
 
     async def handle_client(self, websocket, path):
-        # Register new client connection
         self.clients.add(websocket)
         print(f"New client connected: {websocket.remote_address}")
+        print(f"Waiting for {self.num_clients - len(self.clients)} more clients to join...")
+
+        if self.is_lobby_full():
+            self.lobby_full_event.set()
 
         try:
+            await self.lobby_full_event.wait()
             async for message in websocket:
-                # print(f"[{self.__class__.__name__}] Received message from client: {message}")
                 await self.on_message(websocket, message)
         except websockets.exceptions.ConnectionClosed:
             print(f"Client disconnected: {websocket.remote_address}")
         finally:
-            # Unregister the client on disconnection
             self.clients.remove(websocket)
+            if len(self.clients) < self.num_clients:
+                self.lobby_full_event.clear()
 
     async def on_message(self, client_socket, message: str):
         await self.message_queue.put((client_socket, message))
