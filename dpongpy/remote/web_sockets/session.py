@@ -1,6 +1,4 @@
-import asyncio
 import websockets
-from typing import Tuple
 from dpongpy.remote import Address
 from dpongpy.log import logger
 
@@ -36,39 +34,3 @@ class WebSocketSession:
             f"[{self.__class__.__name__}] Closing connection with {self.remote_address}"
         )
         await self.close()
-
-
-if __name__ == "__main__":
-
-    async def run_client():
-        session = WebSocketSession(("localhost", 1234))
-
-        try:
-            # Manually connect
-            await session.connect()
-            print("Connected to server")
-
-            # Send exactly 5 simple messages
-            for i in range(5):
-                message = f"Simple message {i + 1}"
-                await session.send(message)
-                print(f"Sent: {message}")
-
-                # Optionally, await a response if necessary
-                try:
-                    response = await asyncio.wait_for(
-                        session.receive(), timeout=1
-                    )  # Optional timeout
-                    print(f"Received from server: {response}")
-                except asyncio.TimeoutError:
-                    print("No response from server, continuing to next message.")
-
-                await asyncio.sleep(0.5)  # Small delay between sending messages
-        except websockets.exceptions.ConnectionClosed as e:
-            print(f"Connection closed: {e}")
-        finally:
-            # Ensure the connection is closed
-            await session.close()
-            print("Connection closed")
-
-    asyncio.run(run_client())

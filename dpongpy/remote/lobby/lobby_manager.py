@@ -1,5 +1,3 @@
-# lobby_manager.py
-
 from typing import List, Optional
 import uuid
 from asyncio import Lock
@@ -55,10 +53,6 @@ class LobbyManager:
         async with self.lock:
             return self.lobby
 
-    async def delete_lobby(self):
-        async with self.lock:
-            self.lobby = None
-
     async def join_lobby(self, player: str) -> bool:
         print(f"Attempting to join lobby with player: {player}")
         async with self.lock:
@@ -78,17 +72,3 @@ class LobbyManager:
                 print(f"Player {player} successfully joined the lobby")
                 print(f"Updated players in lobby: {self.lobby.players}")
                 return True
-
-
-    async def leave_lobby(self, player: str) -> bool:
-        async with self.lock:
-            if self.lobby is None:
-                return False
-            async with self.lobby.lock:
-                if player in self.lobby.players:
-                    self.lobby.players.remove(player)
-                    # Optionally, delete the lobby if empty
-                    if not self.lobby.players:
-                        self.lobby = None
-                    return True
-                return False

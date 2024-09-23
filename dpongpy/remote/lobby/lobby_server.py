@@ -10,7 +10,6 @@ from dpongpy.remote.lobby.lobby_manager import (
 from dpongpy.remote.lobby.response_models import LobbyResponse, MessageResponse
 
 
-# Data Models for Requests
 class CreateLobbyRequest(BaseModel):
     name: str
     max_players: int = 2

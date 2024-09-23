@@ -5,6 +5,7 @@ import dpongpy.model
 import dpongpy.controller
 import argparse
 
+from dpongpy.log import logger
 from dpongpy.remote.lobby.lobby_server import LobbyServer
 
 
@@ -13,7 +14,8 @@ def run_lobby_server(host: str, api_port: int, ws_port: int):
     Runs the LobbyServer in a separate thread.
 
     :param host: Host address to bind the server.
-    :param port: Port number to bind the server.
+    :param api_port: Port number for the RESTful API.
+    :param ws_port: Port number for the WebSocket server.
     """
     server = LobbyServer(host=host, api_port=api_port, ws_port=ws_port)
     server.run()
@@ -34,7 +36,6 @@ def arg_parser():
         "--comm-type",
         "-c",
         choices=["udp", "zmq", "web_sockets"],
-        # FIXME: remove
         default="web_sockets",
         required=False,
         help="Specify the communication type (UDP or ZeroMQ) for centralised mode",
@@ -148,7 +149,7 @@ if args.mode == "centralised":
             )
             api_server_thread.start()
 
-            print("Starting web_sockets coordinator")
+            logger.info("Starting web_sockets coordinator")
 
             dpongpy.remote.centralised.main_coordinator(settings)
             exit(0)
@@ -167,13 +168,14 @@ if args.mode == "centralised":
             lobby_manager = LobbyManagerClient(
                 base_url=args.api_url, api_port=args.api_port
             )
-            print("Lobby API url: ", args.api_url)
+            logger.debug("Lobby API url: ", args.api_url)
 
             client_name = f"client_{uuid.uuid4().hex[:8]}_{int(time.time())}"
-            print(f"Generated client name: {client_name}")
+            logger.debug(f"Generated client name: {client_name}")
 
-            print("Connecting to lobby...")
+            logger.info("Connecting to lobby...")
             response = lobby_manager.join_lobby(client_name)
+            assert response is not None, "Failed to get to lobby from API"
 
             # Retrieve the websocket information from the response
             if response.lobby:
@@ -185,8 +187,6 @@ if args.mode == "centralised":
             dpongpy.remote.centralised.main_terminal(settings)
             exit(0)
         else:
-            print("NO WEB SOCKETS")
-
             dpongpy.remote.centralised.main_terminal(settings)
             exit(0)
     print(f"Invalid role: {args.role}. Must be either 'coordinator' or 'terminal'")

@@ -1,5 +1,4 @@
 import asyncio
-import json
 import sys
 from typing import Optional
 
@@ -59,35 +58,6 @@ class LobbyManagerClient:
             )
         except Exception as err:
             print(f"An error occurred while joining lobby: {err}")
-        return None
-
-    def leave_lobby(self) -> Optional[MessageResponse]:
-        if not self.player_name:
-            print("You are not currently in a lobby.")
-            return None
-        payload = {"player": self.player_name}
-        try:
-            response = requests.post(f"{self.api_base_url}/leave", json=payload)
-            response.raise_for_status()
-            message_data = response.json()
-            message = MessageResponse(**message_data)
-            print("Leave message:", message.message)
-            if message.lobby:
-                self.current_lobby = message.lobby
-            else:
-                self.current_lobby = None
-            self.player_name = None
-            return message
-        except requests.exceptions.HTTPError as http_err:
-            try:
-                error_detail = response.json().get("detail", "Unknown error")
-            except ValueError:
-                error_detail = "No detail provided."
-            print(
-                f"HTTP error occurred while leaving lobby: {http_err} - {error_detail}"
-            )
-        except Exception as err:
-            print(f"An error occurred while leaving lobby: {err}")
         return None
 
     def get_lobby(self) -> Optional[LobbyResponse]:
