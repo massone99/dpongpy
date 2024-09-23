@@ -4,19 +4,18 @@ import uuid
 import dpongpy.model
 import dpongpy.controller
 import argparse
-import uvicorn
+
+from dpongpy.remote.lobby.lobby_server import LobbyServer
 
 
-def run_server():
-    from dpongpy.remote.lobby.lobby_server import app
-    
-    # Create a Uvicorn server configuration
-    config = uvicorn.Config(app=app, host="127.0.0.1", port=8000)
-    # Instantiate the server
-    server = uvicorn.Server(config)
-    # Store the server instance in app.state for access within the FastAPI app
-    app.state.server = server
-    # Run the server
+def run_lobby_server(host: str, api_port: int, ws_port: int):
+    """
+    Runs the LobbyServer in a separate thread.
+
+    :param host: Host address to bind the server.
+    :param port: Port number to bind the server.
+    """
+    server = LobbyServer(host=host, api_port=api_port, ws_port=ws_port)
     server.run()
 
 
@@ -142,15 +141,16 @@ if args.mode == "centralised":
         # Check if the comm_type is web_sockets
         if args.comm_type == "web_sockets":
             # Start the server to manage the REST API
-            from dpongpy.remote.lobby.lobby_server import app
-            import uvicorn
-
-            api_server_thread = threading.Thread(target=run_server)
+            api_server_thread = threading.Thread(
+                target=run_lobby_server,
+                args=(args.host, args.api_port, args.port),
+                daemon=True,
+            )
             api_server_thread.start()
 
             print("Starting web_sockets coordinator")
 
-            # dpongpy.remote.centralised.main_coordinator(settings)
+            dpongpy.remote.centralised.main_coordinator(settings)
             exit(0)
         else:
             dpongpy.remote.centralised.main_coordinator(settings)
@@ -182,9 +182,7 @@ if args.mode == "centralised":
             else:
                 raise ValueError("No lobby found")
 
-            # if the lobby is full, then create the terminal
-            # if lobby_manager.get_lobby().is_full:
-            #     dpongpy.remote.centralised.main_terminal(settings)
+            dpongpy.remote.centralised.main_terminal(settings)
             exit(0)
         else:
             print("NO WEB SOCKETS")

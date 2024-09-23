@@ -11,7 +11,7 @@ class Lobby:
         name: str,
         max_players: int = 2,
         address: str = "127.0.0.1",
-        port: int = 8000,
+        port: int = 12345,
     ):
         self.id = str(uuid.uuid4())
         self.name = name

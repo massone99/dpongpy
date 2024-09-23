@@ -68,7 +68,7 @@ class PongCoordinator(PongGame):
                 )
 
     def prepare_server_web_sockets(self):
-        logger.info(
+        print(
             f"[{self.__class__.__name__}] Using WebSockets as the communication technology"
         )
         from dpongpy.remote.web_sockets.server import Server
@@ -282,6 +282,8 @@ class PongTerminal(PongGame):
         self.client = WebSocketSession(
             (self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT)
         )
+
+        print("Connecting to server at", self.settings.host, self.settings.port)
 
         self.event_loop = asyncio.new_event_loop()
 
