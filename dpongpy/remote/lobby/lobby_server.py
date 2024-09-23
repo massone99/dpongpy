@@ -1,9 +1,7 @@
 import asyncio
-import os
-import sys
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 from dpongpy.remote.lobby.lobby_manager import LobbyManager  # Adjust based on your project structure
 from dpongpy.remote.lobby.response_models import LobbyResponse, MessageResponse
 
@@ -75,9 +73,8 @@ async def join_lobby(request: JoinLobbyRequest, background_tasks: BackgroundTask
 async def shutdown():
     print("Initiating graceful shutdown...")
     await asyncio.sleep(2)  # Give some time for the response to be sent
-    for task in asyncio.all_tasks():
-        task.cancel()
-    asyncio.get_event_loop().stop()
+    # Access the server instance and set should_exit to True
+    app.state.server.should_exit = True
 
 
 
@@ -92,19 +89,20 @@ async def leave_lobby(request: LeaveLobbyRequest):
     else:
         return MessageResponse(message=f"{request.player} left the lobby. Lobby is now empty and closed.", lobby=None)
 
+# TODO: REMOVE
 # WebSocket Handling (if applicable)
-@app.websocket("/ws/lobby")
-async def websocket_endpoint(websocket: WebSocket):
-    lobby = await lobby_manager.get_lobby()
-    if not lobby:
-        await websocket.close(code=1008)  # Policy Violation
-        return
-    await lobby_manager.connect(websocket)  # Implement connect method in LobbyManager
-    try:
-        while True:
-            data = await websocket.receive_text()
-            # Handle incoming messages and broadcast to other players
-            await lobby_manager.broadcast(data)  # Implement broadcast method in LobbyManager
-    except WebSocketDisconnect:
-        await lobby_manager.disconnect(websocket)  # Implement disconnect method in LobbyManager
-        # Optionally, handle player disconnection logic
+# @app.websocket("/ws/lobby")
+# async def websocket_endpoint(websocket: WebSocket):
+#     lobby = await lobby_manager.get_lobby()
+#     if not lobby:
+#         await websocket.close(code=1008)  # Policy Violation
+#         return
+#     await lobby_manager.connect(websocket)  # Implement connect method in LobbyManager
+#     try:
+#         while True:
+#             data = await websocket.receive_text()
+#             # Handle incoming messages and broadcast to other players
+#             await lobby_manager.broadcast(data)  # Implement broadcast method in LobbyManager
+#     except WebSocketDisconnect:
+#         await lobby_manager.disconnect(websocket)  # Implement disconnect method in LobbyManager
+#         # Optionally, handle player disconnection logic

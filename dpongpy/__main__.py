@@ -4,6 +4,20 @@ import uuid
 import dpongpy.model
 import dpongpy.controller
 import argparse
+import uvicorn
+
+
+def run_server():
+    from dpongpy.remote.lobby.lobby_server import app
+    
+    # Create a Uvicorn server configuration
+    config = uvicorn.Config(app=app, host="127.0.0.1", port=8000)
+    # Instantiate the server
+    server = uvicorn.Server(config)
+    # Store the server instance in app.state for access within the FastAPI app
+    app.state.server = server
+    # Run the server
+    server.run()
 
 
 def arg_parser():
@@ -40,7 +54,7 @@ def arg_parser():
     networking.add_argument(
         "--port", "-p", help="Port to connect to", type=int, default=None
     )
-    # Argument added to manage the lobby via REST API before the game starts
+    # Arguments added to manage the lobby via REST API before the game starts
     networking.add_argument(
         "--api-url",
         type=str,
@@ -131,10 +145,7 @@ if args.mode == "centralised":
             from dpongpy.remote.lobby.lobby_server import app
             import uvicorn
 
-            api_server_thread = threading.Thread(
-                target=uvicorn.run,
-                kwargs={"app": app, "host": "127.0.0.1", "port": 8000}
-            )
+            api_server_thread = threading.Thread(target=run_server)
             api_server_thread.start()
 
             print("Starting web_sockets coordinator")
