@@ -33,17 +33,17 @@ class PongCoordinator(PongGame):
         super().__init__(settings)
         self.pong.reset_ball((0, 0))
         self.communication_technology = settings.comm_technology
-        match self.communication_technology:
-            case "zmq":
-                self.prepare_server_zmq()
-            case "udp":
-                self.prepare_server_udp()
-            case "web_sockets":
-                self.prepare_server_web_sockets()
-            case _:
-                raise ValueError(
-                    f"Invalid communication technology: {self.communication_technology}"
-                )
+        if (
+            self.communication_technology == "zmq"
+            or self.communication_technology == "udp"
+        ):
+            self.prepare_server_udp_or_zmq()
+        elif self.communication_technology == "web_sockets":
+            self.prepare_server_web_sockets()
+        else:
+            raise ValueError(
+                f"Invalid communication technology: {self.communication_technology}"
+            )
 
     async def _handle_ingoing_messages_async(self):
         assert self.running, "Server is not running"
@@ -66,6 +66,23 @@ class PongCoordinator(PongGame):
                 raise RuntimeError(
                     f"[{self.__class__.__name__}] Receive operation returned None"
                 )
+
+    def prepare_server_udp_or_zmq(self):
+        from dpongpy.remote.zmq_tcp import Server as ZMQServer
+        from dpongpy.remote.udp import Server as UDPServer
+
+        self.server = (
+            ZMQServer(self.settings.port or DEFAULT_PORT)
+            if self.communication_technology == "zmq"
+            else UDPServer(self.settings.port or DEFAULT_PORT)
+        )
+
+        self._event_loop_thread = threading.Thread(
+            target=self.__handle_ingoing_messages, daemon=True
+        )
+        self._event_loop_thread.start()
+        self._peers = set()
+        self._lock = threading.RLock()
 
     def prepare_server_web_sockets(self):
         print(
@@ -94,34 +111,6 @@ class PongCoordinator(PongGame):
         asyncio.run_coroutine_threadsafe(
             self._handle_ingoing_messages_async(), self.event_loop
         )
-
-    def prepare_server_udp(self):
-        logger.info(
-            f"[{self.__class__.__name__}] Using UDP as the communication technology"
-        )
-        from dpongpy.remote.udp import Server
-
-        self.server = Server(self.settings.port or DEFAULT_PORT)
-        self._event_loop_thread = threading.Thread(
-            target=self.__handle_ingoing_messages, daemon=True
-        )
-        self._event_loop_thread.start()
-        self._peers = set()
-        self._lock = threading.RLock()
-
-    def prepare_server_zmq(self):
-        logger.info(
-            f"[{self.__class__.__name__}] Using ZeroMQ as the communication technology"
-        )
-        from dpongpy.remote.zmq_tcp import Server
-
-        self.server = Server(self.settings.port or DEFAULT_PORT)
-        self._event_loop_thread = threading.Thread(
-            target=self.__handle_ingoing_messages, daemon=True
-        )
-        self._event_loop_thread.start()
-        self._peers = set()
-        self._lock = threading.RLock()
 
     def create_view(coordinator):
         from dpongpy.controller.local import ControlEvent
@@ -246,17 +235,10 @@ class PongTerminal(PongGame):
         super().__init__(settings)
         self.pong.reset_ball((0, 0))
         self.communication_technology = settings.comm_technology
-        match self.communication_technology:
-            case "zmq":
-                self.prepare_client_zmq()
-            case "udp":
-                self.prepare_client_udp()
-            case "web_sockets":
-                self.prepare_client_web_sockets()
-            case _:
-                raise ValueError(
-                    f"Invalid communication technology: {self.communication_technology}"
-                )
+        if self.communication_technology != "web_sockets":
+            self.prepare_client_zmq_or_udp()
+        else:
+            self.prepare_client_web_sockets()
 
     async def _handle_ingoing_messages_async(self):
         assert self.running, "Client is not running"
@@ -272,6 +254,27 @@ class PongTerminal(PongGame):
                 raise RuntimeError(
                     f"[{self.__class__.__name__}] Receive operation returned None"
                 )
+
+    def prepare_client_zmq_or_udp(self):
+        from dpongpy.remote.zmq_tcp import Client as ZMQClient
+        from dpongpy.remote.udp import Client as UDPClient
+
+        if self.communication_technology == "zmq":
+            client_class = ZMQClient
+        else:
+            client_class = UDPClient
+
+        host = self.settings.host or DEFAULT_HOST
+        port = self.settings.port or DEFAULT_PORT
+
+        self.client = client_class((host, port))
+
+        self._event_loop_thread = threading.Thread(
+            target=self._handle_ingoing_messages_async, daemon=True
+        )
+        self._event_loop_thread.start()
+        self._peers = set()
+        self._lock = threading.RLock()
 
     def prepare_client_web_sockets(self):
         logger.info(
@@ -300,38 +303,6 @@ class PongTerminal(PongGame):
         asyncio.run_coroutine_threadsafe(
             self._handle_ingoing_messages_async(), loop=self.event_loop
         )
-
-    def prepare_client_zmq(self):
-        logger.info(
-            f"[{self.__class__.__name__}] Using ZeroMQ as the communication technology"
-        )
-        from dpongpy.remote.zmq_tcp import Client
-
-        self.client = Client(
-            (self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT)
-        )
-        self._thread_receiver = threading.Thread(
-            target=self.__handle_ingoing_messages, daemon=True
-        )
-        self._thread_receiver.start()
-        self._peers = set()
-        self._lock = threading.RLock()
-
-    def prepare_client_udp(self):
-        logger.info(
-            f"[{self.__class__.__name__}] Using UDP as the communication technology"
-        )
-        from dpongpy.remote.udp import Client
-
-        self.client = Client(
-            (self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT)
-        )
-        self._thread_receiver = threading.Thread(
-            target=self.__handle_ingoing_messages, daemon=True
-        )
-        self._thread_receiver.start()
-        self._peers = set()
-        self._lock = threading.RLock()
 
     def create_controller(terminal, paddle_commands=None):
         from dpongpy.controller.local import EventHandler, PongInputHandler

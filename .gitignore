@@ -3,6 +3,7 @@ node_modules/
 tmp/
 .idea/
 .vscode/
+.zed/
 .DS_Store
 *.data
 demo/

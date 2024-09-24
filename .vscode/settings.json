@@ -9,4 +9,6 @@
     "python.testing.pytestEnabled": false,
     "python.testing.unittestEnabled": true,
     "python.testing.autoTestDiscoverOnSaveEnabled": true,
+    "codescene.previewCodeHealthGate": true,
+    "codescene.enableAutoRefactor": true,
 }
