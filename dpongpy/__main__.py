@@ -36,7 +36,6 @@ def arg_parser():
         "--comm-type",
         "-c",
         choices=["udp", "zmq", "web_sockets"],
-        default="web_sockets",
         required=False,
         help="Specify the communication type (UDP or ZeroMQ) for centralised mode",
     )
@@ -104,6 +103,7 @@ def args_to_settings(args):
     settings.port = args.port
     settings.debug = args.debug
     settings.size = tuple(args.size)
+    settings.comm_technology = args.comm_type
     settings.fps = args.fps
     if args.keys is None:
         args.keys = list(dpongpy.controller.ActionMap.all_mappings().keys())[

@@ -8,6 +8,7 @@ from dpongpy.controller import ControlEvent
 from dpongpy.model import *
 from dpongpy.remote.presentation import deserialize, serialize
 from dpongpy.log import logger
+from dpongpy.remote.web_sockets.session import WebSocketSession
 
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12345
@@ -192,7 +193,7 @@ class PongCoordinator(PongGame):
                     self.server.send(client_socket=peer, payload=event)
                 )
             else:
-                self.server.send(client_socket=peer, message=event)
+                self.server.send(peer, event)
 
     def __handle_ingoing_messages(self):
         try:
@@ -270,7 +271,7 @@ class PongTerminal(PongGame):
         self.client = client_class((host, port))
 
         self._event_loop_thread = threading.Thread(
-            target=self._handle_ingoing_messages_async, daemon=True
+            target=self.__handle_ingoing_messages, daemon=True
         )
         self._event_loop_thread.start()
         self._peers = set()
@@ -314,12 +315,14 @@ class PongTerminal(PongGame):
             def post_event(self, event: Event | ControlEvent, **kwargs):
                 event = super().post_event(event, **kwargs)
                 if not ControlEvent.TIME_ELAPSED.matches(event):
-                    assert terminal.client.websocket.open, "Websocket is not open"
+                    if isinstance(terminal.client, WebSocketSession):
+                        assert terminal.client.websocket.open, "Websocket is not open"
 
-                    # terminal.client.send(serialize(event))
-                    loop = asyncio.get_event_loop()
-                    # Execute event on the event loop in a blocking way
-                    loop.run_until_complete(terminal.client.send(serialize(event)))
+                        loop = asyncio.get_event_loop()
+                        # Execute event on the event loop in a blocking way
+                        loop.run_until_complete(terminal.client.send(serialize(event)))
+                    else:
+                        terminal.client.send(serialize(event))
                 return event
 
             def handle_inputs(self, dt=None):
