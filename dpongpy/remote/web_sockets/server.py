@@ -76,13 +76,3 @@ class Server:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
-
-
-if __name__ == "__main__":
-    server = Server(1234)
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(server.start())
-        loop.run_forever()  # Keep the loop running
-    finally:
-        loop.run_until_complete(server.close())
