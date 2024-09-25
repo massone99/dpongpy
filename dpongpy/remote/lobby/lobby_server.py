@@ -23,7 +23,7 @@ class LeaveLobbyRequest(BaseModel):
 
 class LobbyServer:
     def __init__(
-        self, host: str = "127.0.0.1", api_port: int = 8000, ws_port: int = 5000
+        self, host: str = "127.0.0.1", api_port: int = 8000, ws_port: int = 5000, num_players: int = 2
     ):
         """
         Initializes the LobbyServer to serve on the specified host and port.
@@ -33,6 +33,7 @@ class LobbyServer:
         """
         self.host = host
         self.port = api_port
+        self.num_players = num_players
         self.app = FastAPI()
         self.lobby_manager = LobbyManager(address=host, port=ws_port)
         self.setup_routes()
@@ -68,10 +69,9 @@ class LobbyServer:
             if not lobby:
                 # No lobby exists; create a new one with default parameters
                 default_lobby_name = "Auto-Created Lobby"
-                default_max_players = 2  # You can adjust this as needed
                 try:
                     lobby = await self.lobby_manager.create_lobby(
-                        default_lobby_name, default_max_players
+                        default_lobby_name, self.num_players
                     )
                     print(f"Lobby '{default_lobby_name}' created automatically.")
                 except Exception as e:

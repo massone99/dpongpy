@@ -9,7 +9,7 @@ from dpongpy.log import logger
 from dpongpy.remote.lobby.lobby_server import LobbyServer
 
 
-def run_lobby_server(host: str, api_port: int, ws_port: int):
+def run_lobby_server(host: str, api_port: int, ws_port: int, num_players: int):
     """
     Runs the LobbyServer in a separate thread.
 
@@ -17,7 +17,7 @@ def run_lobby_server(host: str, api_port: int, ws_port: int):
     :param api_port: Port number for the RESTful API.
     :param ws_port: Port number for the WebSocket server.
     """
-    server = LobbyServer(host=host, api_port=api_port, ws_port=ws_port)
+    server = LobbyServer(host=host, api_port=api_port, ws_port=ws_port, num_players=num_players)
     server.run()
 
 
@@ -33,20 +33,27 @@ def arg_parser():
         help="Run the game in local or centralised mode",
     )
     mode.add_argument(
-        "--comm-type",
-        "-c",
-        choices=["udp", "zmq", "web_sockets"],
-        required=False,
-        help="Specify the communication type (UDP or ZeroMQ) for centralised mode",
-    )
-    mode.add_argument(
         "--role",
         "-r",
         required=False,
         choices=["coordinator", "terminal"],
         help="Run the game with a central coordinator, in either coordinator or terminal role",
     )
+    mode.add_argument(
+        "--num-players",
+        "-n",
+        type=int,
+        default=2,
+        help="Number of players in the game (only used in centralised mode)",
+    )
     networking = ap.add_argument_group("networking")
+    networking.add_argument(
+        "--comm-type",
+        "-c",
+        choices=["udp", "zmq", "web_sockets"],
+        required=False,
+        help="Specify the communication type (UDP or ZeroMQ) for centralised mode",
+    )
     networking.add_argument(
         "--host", "-H", help="Host to connect to", type=str, default="localhost"
     )
@@ -142,7 +149,7 @@ if args.mode == "centralised":
             # Start the server to manage the REST API
             api_server_thread = threading.Thread(
                 target=run_lobby_server,
-                args=(args.host, args.api_port, args.port),
+                args=(args.host, args.api_port, args.port, args.num_players),
                 daemon=True,
             )
             api_server_thread.start()
