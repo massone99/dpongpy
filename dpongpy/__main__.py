@@ -136,8 +136,6 @@ if args.mode == "local":
 if args.mode == "centralised":
     import dpongpy.remote.centralised
 
-    # The coordinators models also the entity which manages the REST API
-    # for managing the lobby, so it must be started without any precondition
     if args.role == "coordinator":
         # Check if the comm_type is web_sockets
         if args.comm_type == "web_sockets":
@@ -157,8 +155,6 @@ if args.mode == "centralised":
             dpongpy.remote.centralised.main_coordinator(settings)
             exit(0)
     if args.role == "terminal":
-        # The PongTerminal on the other side can be created only if the lobby is full, to avoid the graphic rendering
-        # of the game UI
         if args.comm_type == "web_sockets":
             # Prompt the server to join the lobby using the REST API
             print("Starting lobby management for client")

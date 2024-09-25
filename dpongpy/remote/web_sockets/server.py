@@ -19,7 +19,7 @@ class Server:
     async def start(self):
         # Start the server and serve clients continuously without a loop
         self.server = await websockets.serve(self.handle_client, "localhost", self.port)
-        print(f"Server listening on IP: localhost, Port: {self.port}")
+        print(f"Websocket listening on IP: localhost, Port: {self.port}")
 
 
     async def handle_client(self, websocket, path):
@@ -29,6 +29,7 @@ class Server:
 
         if self.is_lobby_full():
             self.lobby_full_event.set()
+            print("\033[92mStarting game...\033[0m")
 
         try:
             await self.lobby_full_event.wait()

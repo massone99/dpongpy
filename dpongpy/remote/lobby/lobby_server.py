@@ -4,9 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 import uvicorn
-from dpongpy.remote.lobby.lobby_manager import (
-    LobbyManager,
-)  # Adjust based on your project structure
+from dpongpy.remote.lobby.lobby_manager import LobbyManager
 from dpongpy.remote.lobby.response_models import LobbyResponse, MessageResponse
 
 
@@ -28,7 +26,7 @@ class LobbyServer:
         self, host: str = "127.0.0.1", api_port: int = 8000, ws_port: int = 5000
     ):
         """
-        Initializes the LobbyServer with specified host and port.
+        Initializes the LobbyServer to serve on the specified host and port.
 
         :param host: Host address to bind the server.
         :param port: Port number to bind the server.
@@ -123,7 +121,7 @@ class LobbyServer:
         """
         Initiates a graceful shutdown of the server.
         """
-        print("Initiating graceful shutdown...")
+        print("Initiating API server shutdown...")
         await asyncio.sleep(2)  # Give some time for the response to be sent
         # Access the server instance and set should_exit to True
         if hasattr(self.app.state, "server"):
