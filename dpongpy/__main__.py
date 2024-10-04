@@ -62,7 +62,7 @@ def arg_parser():
     )
     # Arguments added to manage the lobby via REST API before the game starts
     networking.add_argument(
-        "--api-url",
+        "--api-host",
         type=str,
         default="http://localhost",
         help="URL of the lobby management API",
@@ -111,6 +111,7 @@ def args_to_settings(args):
     settings.debug = args.debug
     settings.size = tuple(args.size)
     settings.comm_technology = args.comm_type
+    settings.num_players = args.num_players
     settings.fps = args.fps
     if args.keys is None:
         args.keys = list(dpongpy.controller.ActionMap.all_mappings().keys())[
@@ -169,9 +170,9 @@ if args.mode == "centralised":
             from dpongpy.remote.lobby.lobby_client import LobbyManagerClient
 
             lobby_manager = LobbyManagerClient(
-                base_url=args.api_url, api_port=args.api_port
+                base_url=args.api_host, api_port=args.api_port
             )
-            logger.debug("Lobby API url: ", args.api_url)
+            logger.debug("Lobby API host: ", args.api_host)
 
             client_name = f"client_{uuid.uuid4().hex[:8]}_{int(time.time())}"
             logger.debug(f"Generated client name: {client_name}")
