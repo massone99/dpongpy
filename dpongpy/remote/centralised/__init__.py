@@ -1,5 +1,6 @@
 import threading
 
+from dpongpy.remote.ws import WebSocketPongCoordinator
 import pygame
 from pygame.event import Event
 import asyncio
@@ -91,7 +92,9 @@ class PongCoordinator(PongGame):
         )
         from dpongpy.remote.web_sockets.server import Server
 
-        self.server = Server(self.settings.port or DEFAULT_PORT, num_clients=self.settings.num_players)
+        self.server = Server(
+            self.settings.port or DEFAULT_PORT, num_clients=self.settings.num_players
+        )
 
         # Create a new event loop for the WebSocket server
         self.event_loop = asyncio.new_event_loop()
@@ -380,7 +383,8 @@ class PongTerminal(PongGame):
 
 
 def main_coordinator(settings=None):
-    PongCoordinator(settings).run()
+    # PongCoordinator(settings).run()
+    WebSocketPongCoordinator(settings).run()
 
 
 def main_terminal(settings=None):

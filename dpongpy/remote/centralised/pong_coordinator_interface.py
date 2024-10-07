@@ -1,15 +1,40 @@
-from dpongpy import Settings
+from dpongpy import PongGame, Settings
 from dpongpy.controller import ControlEvent
 from dpongpy.model import Direction, Pong
+from dpongpy.remote.presentation import serialize
 from dpongpy.view import PongView
+from dpongpy.log import logger
+
+DEFAULT_HOST = "localhost"
+DEFAULT_PORT = 12345
+
+class Loggable:
+  @classmethod
+  def log(cls, template, *args, **kwargs):
+    level = kwargs.get('level', logger.DEBUG)
+    logger.log(level, f'[{cls.__name__}]' + template, *args)
+  
+  @classmethod
+  def error(cls, template, *args, **kwargs):
+    type = kwargs.get('type', RuntimeError)
+    return type((f'[{cls.__name__}]' + template) % args)
 
 
-class IRemotePongCoordinator:
+class IRemotePongCoordinator(PongGame, Loggable):
     def __init__(self, settings: Settings = None):
-        pass
+        settings = settings or Settings()
+        settings.initial_paddles = []
+        PongGame.__init__(self, settings) # cambia il modo in cui si chiama il super costruttore nel l'ereditarietà multipla
+        self.pong.reset_ball((0, 0))
+        self.communication_technology = settings.comm_technology
+        self.initialize()
 
     def initialize(self):
-        pass
+        """
+        This method should implement the specific initialization
+        linked to each technology (e.g. UDP, ZMQ, WebSockets).
+        """
+        raise NotImplementedError("Must be implemented by subclasses")
 
     def start_server(self):
         raise NotImplementedError("Must be implemented by subclasses")
@@ -59,22 +84,34 @@ class IRemotePongCoordinator:
 
         return Controller(coordinator.pong)
 
+    def __handle_ingoing_messages(self):
+        raise NotImplementedError("Must be implemented by subclasses")
+
     def before_run(self):
-        pass
+        logger.info("Coordinator starting")
+        super().before_run()
 
     def at_each_run(self):
         pass
 
     def after_run(self):
-        pass
+        self.server.close()
+        print("\033[32mCoordinator stopped gracefully\033[0m")
+        super().after_run()
 
     @property
     def peers(self):
-        raise NotImplementedError("Must be implemented by subclasses")
+        with self._lock:
+            return set(self._peers)
 
     @peers.setter
     def peers(self, value):
-        raise NotImplementedError("Must be implemented by subclasses")
+        with self._lock:
+            self._peers = set(value)
 
-    def add_peer(self, peer: object):
+    def add_peer(self, peer):
+        with self._lock:
+            self._peers.add(peer)
+
+    def _broadcast_to_all_peers(self, message):
         raise NotImplementedError("Must be implemented by subclasses")
