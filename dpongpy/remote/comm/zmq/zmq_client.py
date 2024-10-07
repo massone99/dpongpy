@@ -1,5 +1,5 @@
 from dpongpy.remote import Address, Session
-
+import zmq
 
 class ZeroMQSession(Session):
     def __init__(

@@ -1,6 +1,7 @@
 import threading
 
 from dpongpy.remote.ws import WebSocketPongCoordinator
+from dpongpy.remote.zmq import ZmqPongCoordinator
 import pygame
 from pygame.event import Event
 import asyncio
@@ -260,7 +261,7 @@ class PongTerminal(PongGame):
                 )
 
     def prepare_client_zmq_or_udp(self):
-        from dpongpy.remote.zmq.zmq_server import Client as ZMQClient
+        from dpongpy.remote.comm.zmq.zmq_client import Client as ZMQClient
         from dpongpy.remote.udp import Client as UDPClient
 
         if self.communication_technology == "zmq":
@@ -384,7 +385,8 @@ class PongTerminal(PongGame):
 
 def main_coordinator(settings=None):
     # PongCoordinator(settings).run()
-    WebSocketPongCoordinator(settings).run()
+    # WebSocketPongCoordinator(settings).run()
+    ZmqPongCoordinator(settings).run()
 
 
 def main_terminal(settings=None):

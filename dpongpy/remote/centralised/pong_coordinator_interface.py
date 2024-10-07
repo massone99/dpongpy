@@ -114,4 +114,10 @@ class IRemotePongCoordinator(PongGame, Loggable):
             self._peers.add(peer)
 
     def _broadcast_to_all_peers(self, message):
-        raise NotImplementedError("Must be implemented by subclasses")
+        '''
+        Default implementation. Suitable for sychronous communication like ZMQ or UDP.
+        Not compatible with WebSockets implementation
+        '''
+        event = serialize(message)
+        for peer in self.peers:
+            self.server.send(peer, event)

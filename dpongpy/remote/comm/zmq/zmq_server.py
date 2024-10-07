@@ -1,7 +1,7 @@
 import binascii
 from typing import Optional, Tuple
 
-from dpongpy.remote.zmq.zmq_session import ZeroMQSession
+from dpongpy.remote.comm.zmq.zmq_client import ZeroMQSession
 import zmq
 from dpongpy.log import logger
 from dpongpy.remote import Address, Server
