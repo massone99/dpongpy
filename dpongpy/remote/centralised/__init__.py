@@ -1,5 +1,6 @@
 import threading
 
+from dpongpy.remote.ws import WebSocketPongCoordinator, WebSocketPongTerminal
 from dpongpy.remote.zmq import ZmqPongCoordinator, ZmqPongTerminal
 import pygame
 from pygame.event import Event
@@ -383,11 +384,27 @@ class PongTerminal(PongGame):
 
 
 def main_coordinator(settings=None):
-    # PongCoordinator(settings).run()
-    # WebSocketPongCoordinator(settings).run()
-    ZmqPongCoordinator(settings).run()
-
+    comm_tech = settings.comm_technology
+    match comm_tech:
+        case "web_sockets":
+            WebSocketPongCoordinator(settings).run()
+        case "zmq":
+            ZmqPongCoordinator(settings).run()
+        case "udp":
+            # UdpPongCoordinator(settings).run()
+            raise NotImplementedError("UDP is not implemented yet")
+        case _:
+            raise Exception(f"Unknown comm_tech: {comm_tech}")
 
 def main_terminal(settings=None):
-    # PongTerminal(settings).run()
-    ZmqPongTerminal(settings).run()
+    comm_tech = settings.comm_technology
+    match comm_tech:
+        case "web_sockets":
+            WebSocketPongTerminal(settings).run()
+        case "zmq":
+            ZmqPongTerminal(settings).run()
+        case "udp":
+            # UdpPongCoordinator(settings).run()
+            raise NotImplementedError("UDP is not implemented yet")
+        case _:
+            raise Exception(f"Unknown comm_tech: {comm_tech}")

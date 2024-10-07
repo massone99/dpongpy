@@ -4,16 +4,35 @@ from dpongpy.remote.centralised.ipong_coordinator import Loggable
 
 import pygame
 from pygame.event import Event
-import asyncio
 from dpongpy import PongGame, Settings
 from dpongpy.controller import ControlEvent
 from dpongpy.model import *
-from dpongpy.remote.presentation import deserialize, serialize
+from dpongpy.remote.presentation import deserialize
 from dpongpy.log import logger
-from dpongpy.remote.comm.web_sockets.ws_client import WebSocketSession
 
 
 class IRemotePongTerminal(PongGame, Loggable):
+    """
+    A terminal interface for a remote Pong game, 
+    which allows interaction through network communication protocols such as WebSockets, ZMQ, or UDP.
+
+    Methods that must be overrriden:
+    - __handle_ingoing_messages() -> None
+
+        This method is responsible for handling incoming messages from the server.
+        The default implementation is suitable only for communication protocols like ZMQ or UDP.
+
+    Methods that must be implemented by subclasses:
+
+    - initialize() -> None
+    
+        This method is responsible for initializing the remote Pong terminal and setting up any necessary configurations or connections to a server over the specified network protocol (WebSockets, ZMQ, etc.).
+
+    - send_event(event: Event) -> None
+    
+        This method is used to transmit events from the local client (terminal) to a remote server or another client. 
+    """
+
     def __init__(self, settings: Settings = None):
         super().__init__(settings)
         settings = settings or Settings()
@@ -27,11 +46,13 @@ class IRemotePongTerminal(PongGame, Loggable):
 
     def initialize(self):
         raise NotImplementedError("Must be implemented by subclasses")
-    
+
     def handle_ingoing_messages(self):
         self.__handle_ingoing_messages()
 
     def send_event(self, event):
+        #FIXME: remove comments
+        
         # WEBSOCKETS
         # loop = asyncio.get_event_loop()
         # # Execute event on the event loop in a blocking way

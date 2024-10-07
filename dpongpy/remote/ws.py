@@ -1,20 +1,22 @@
 import threading
 from dpongpy.controller import ControlEvent
 from dpongpy.remote.centralised.ipong_coordinator import (
+    DEFAULT_HOST,
     DEFAULT_PORT,
     IRemotePongCoordinator,
 )
+from dpongpy.remote.centralised.ipong_terminal import IRemotePongTerminal
 from dpongpy.remote.presentation import deserialize, serialize
 import asyncio
 from dpongpy.log import logger
 import pygame
 from dpongpy.remote.comm.web_sockets.ws_server import Server
 
-class WebSocketPongCoordinator(IRemotePongCoordinator):
-    def _run_event_loop_in_thread(self, loop):
-        asyncio.set_event_loop(loop)
-        loop.run_forever()
+def _run_event_loop_in_thread(loop):
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
 
+class WebSocketPongCoordinator(IRemotePongCoordinator):
     def initialize(self):
         print(
             f"[{self.__class__.__name__}] Using WebSockets as the communication technology"
@@ -29,7 +31,7 @@ class WebSocketPongCoordinator(IRemotePongCoordinator):
 
         # Start the server in a new thread
         self._event_loop_thread = threading.Thread(
-            target=self._run_event_loop_in_thread, args=(self.event_loop,), daemon=True
+            target=_run_event_loop_in_thread, args=(self.event_loop,), daemon=True
         )
         self._event_loop_thread.start()
 
@@ -85,3 +87,54 @@ class WebSocketPongCoordinator(IRemotePongCoordinator):
             self._server.close(),
             asyncio.sleep(1),  # wait for the server to close properly
         )
+
+class WebSocketPongTerminal(IRemotePongTerminal):
+    
+    def initialize(self):
+        logger.info(
+            f"[{self.__class__.__name__}] Using WebSockets as the communication technology"
+        )
+        from dpongpy.remote.comm.web_sockets.ws_client import WebSocketSession
+
+        self.client = WebSocketSession(
+            (self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT)
+        )
+
+        print("Connecting to server at", self.settings.host, self.settings.port)
+
+        self.event_loop = asyncio.new_event_loop()
+
+        self.event_loop.run_until_complete(self.client.connect())
+
+        self._event_loop_thread = threading.Thread(
+            target=_run_event_loop_in_thread, args=(self.event_loop,), daemon=True
+        )
+
+        self._event_loop_thread.start()
+        self._peers = set()
+        self._lock = threading.RLock()
+
+        asyncio.run_coroutine_threadsafe(
+            self._handle_ingoing_messages_async(), loop=self.event_loop
+        )
+        
+    def send_event(self, event):
+        loop = asyncio.get_event_loop()
+        # Execute event on the event loop in a blocking way
+        loop.run_until_complete(self.client.send(serialize(event)))
+    
+    async def _handle_ingoing_messages_async(self):
+        # FIXME: check duplication with method of server
+        assert self.running, "Client is not running"
+        while self.running:
+            message = await self.client.receive()
+            if message is not None:
+                message = deserialize(message)
+                assert isinstance(
+                    message, pygame.event.Event
+                ), f"Expected {pygame.event.Event}, got {type(message)}"
+                pygame.event.post(message)
+            elif self.running:
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Receive operation returned None"
+                )
