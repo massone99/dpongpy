@@ -9,7 +9,7 @@ from dpongpy.controller import ControlEvent
 from dpongpy.model import *
 from dpongpy.remote.presentation import deserialize, serialize
 from dpongpy.log import logger
-from dpongpy.remote.web_sockets.session import WebSocketSession
+from dpongpy.remote.comm.web_sockets.ws_client import WebSocketSession
 
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12345
@@ -70,7 +70,7 @@ class PongCoordinator(PongGame):
                 )
 
     def prepare_server_udp_or_zmq(self):
-        from dpongpy.remote.zmq_tcp import Server as ZMQServer
+        from dpongpy.remote.zmq.zmq_server import Server as ZMQServer
         from dpongpy.remote.udp import Server as UDPServer
 
         self.server = (
@@ -260,7 +260,7 @@ class PongTerminal(PongGame):
                 )
 
     def prepare_client_zmq_or_udp(self):
-        from dpongpy.remote.zmq_tcp import Client as ZMQClient
+        from dpongpy.remote.zmq.zmq_server import Client as ZMQClient
         from dpongpy.remote.udp import Client as UDPClient
 
         if self.communication_technology == "zmq":
@@ -284,7 +284,7 @@ class PongTerminal(PongGame):
         logger.info(
             f"[{self.__class__.__name__}] Using WebSockets as the communication technology"
         )
-        from dpongpy.remote.web_sockets.session import WebSocketSession
+        from dpongpy.remote.comm.web_sockets.ws_client import WebSocketSession
 
         self.client = WebSocketSession(
             (self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT)
