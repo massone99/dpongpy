@@ -1,14 +1,19 @@
 import threading
+from dpongpy import Settings
 from dpongpy.controller import ControlEvent
+from dpongpy.model import Direction, Pong
 from dpongpy.remote.centralised.ipong_coordinator import (
     DEFAULT_PORT,
     IRemotePongCoordinator,
 )
 from dpongpy.remote.presentation import deserialize, serialize
+from dpongpy.view import ShowNothingPongView
+from typing import Tuple, Set, Any, Optional
 import asyncio
 from dpongpy.log import logger
+from dpongpy.remote.web_sockets.server import Server
 import pygame
-from dpongpy.remote.comm.web_sockets.ws_server import Server
+
 
 class WebSocketPongCoordinator(IRemotePongCoordinator):
     def _run_event_loop_in_thread(self, loop):
@@ -19,6 +24,7 @@ class WebSocketPongCoordinator(IRemotePongCoordinator):
         print(
             f"[{self.__class__.__name__}] Using WebSockets as the communication technology"
         )
+        from dpongpy.remote.web_sockets.server import Server
 
         self.server = Server(
             self.settings.port or DEFAULT_PORT, num_clients=self.settings.num_players

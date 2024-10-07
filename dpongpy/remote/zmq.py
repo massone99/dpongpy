@@ -1,7 +1,9 @@
 # Import required modules
 import threading
-from dpongpy.remote.presentation import deserialize
-from dpongpy.remote.centralised.pong_coordinator_interface import (
+from dpongpy.remote.centralised.ipong_terminal import IRemotePongTerminal
+from dpongpy.remote.presentation import deserialize, serialize
+from dpongpy.remote.centralised.ipong_coordinator import (
+    DEFAULT_HOST,
     DEFAULT_PORT,
     IRemotePongCoordinator,
 )
@@ -46,3 +48,30 @@ class ZmqPongCoordinator(IRemotePongCoordinator):
         except Exception as e:
             self.running = False
             raise e
+
+class ZmqPongTerminal(IRemotePongTerminal):
+    def initialize(self):
+        from dpongpy.remote.comm.zmq.zmq_client import Client as ZMQClient
+        from dpongpy.remote.udp import Client as UDPClient
+
+        if self.communication_technology == "zmq":
+            client_class = ZMQClient
+        else:
+            client_class = UDPClient
+
+        host = self.settings.host or DEFAULT_HOST
+        port = self.settings.port or DEFAULT_PORT
+
+        self.client = client_class((host, port))
+
+        self.receiving_thread = threading.Thread(
+            target=super().handle_ingoing_messages, daemon=True
+        )
+        self.receiving_thread.start()
+        self._peers = set()
+        self._lock = threading.RLock()
+    
+    def send_event(self,event):
+        self.client.send(serialize(event))
+    
+    

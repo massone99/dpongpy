@@ -1,7 +1,6 @@
 import threading
 
-from dpongpy.remote.ws import WebSocketPongCoordinator
-from dpongpy.remote.zmq import ZmqPongCoordinator
+from dpongpy.remote.zmq import ZmqPongCoordinator, ZmqPongTerminal
 import pygame
 from pygame.event import Event
 import asyncio
@@ -390,4 +389,5 @@ def main_coordinator(settings=None):
 
 
 def main_terminal(settings=None):
-    PongTerminal(settings).run()
+    # PongTerminal(settings).run()
+    ZmqPongTerminal(settings).run()
