@@ -1,14 +1,10 @@
 import threading
-from dpongpy import Settings
 from dpongpy.controller import ControlEvent
-from dpongpy.model import Direction, Pong
 from dpongpy.remote.centralised.pong_coordinator_interface import (
     DEFAULT_PORT,
     IRemotePongCoordinator,
 )
 from dpongpy.remote.presentation import deserialize, serialize
-from dpongpy.view import ShowNothingPongView
-from typing import Tuple, Set, Any, Optional
 import asyncio
 from dpongpy.log import logger
 from dpongpy.remote.web_sockets.server import Server
