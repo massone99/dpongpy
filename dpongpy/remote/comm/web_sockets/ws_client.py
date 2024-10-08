@@ -1,9 +1,10 @@
 import websockets
 from dpongpy.remote import Address
 from dpongpy.log import logger
+from dpongpy.log import Loggable
 
 
-class WebSocketSession:
+class WebSocketSession(Loggable):
     def __init__(self, remote_address: Address):
         self.websocket = None
         self.remote_address = remote_address
@@ -12,11 +13,11 @@ class WebSocketSession:
 
     async def connect(self):
         self.websocket = await websockets.connect(self.uri)
-        logger.debug(f"[{self.__class__.__name__}] Connected to {self.remote_address}")
+        self.log(f"Connected to {self.remote_address}")
 
     async def send(self, payload: str) -> int:
         await self.websocket.send(payload)
-        logger.debug(f"[{self.__class__.__name__}] Sent: {payload}")
+        self.log(f"Sent: {payload}")
         return len(payload)
 
     async def receive(self) -> str | bytes:
@@ -30,7 +31,5 @@ class WebSocketSession:
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        logger.debug(
-            f"[{self.__class__.__name__}] Closing connection with {self.remote_address}"
-        )
+        self.log(f"Closing connection with {self.remote_address}")
         await self.close()

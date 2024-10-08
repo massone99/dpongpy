@@ -12,15 +12,15 @@ from dpongpy.log import logger
 import pygame
 from dpongpy.remote.comm.web_sockets.ws_server import Server
 
+
 def _run_event_loop_in_thread(loop):
     asyncio.set_event_loop(loop)
     loop.run_forever()
 
+
 class WebSocketPongCoordinator(IRemotePongCoordinator):
     def initialize(self):
-        print(
-            f"[{self.__class__.__name__}] Using WebSockets as the communication technology"
-        )
+        self.log("Using WebSockets as the communication technology")
 
         self.server = Server(
             self.settings.port or DEFAULT_PORT, num_clients=self.settings.num_players
@@ -65,17 +65,16 @@ class WebSocketPongCoordinator(IRemotePongCoordinator):
                 ), f"Expected {pygame.event.Event}, got {type(message)}"
                 pygame.event.post(message)
             elif self.running:
-                raise RuntimeError(
-                    f"[{self.__class__.__name__}] Receive operation returned None"
+                self.error(
+                    "Receive operation returned None: the server may have been closed ahead of time"
                 )
+                raise RuntimeError("Receive operation returned None")
 
     def _broadcast_to_all_peers(self, message):
         event = serialize(message)
         for peer in self.peers:
             loop = asyncio.get_event_loop()
-            loop.run_until_complete(
-                self.server.send(client_socket=peer, payload=event)
-            )
+            loop.run_until_complete(self.server.send(client_socket=peer, payload=event))
 
     def create_event(self, event_type: ControlEvent, dt=None, status=None):
         return ControlEvent(event_type, dt, status, self._pong)
@@ -88,12 +87,11 @@ class WebSocketPongCoordinator(IRemotePongCoordinator):
             asyncio.sleep(1),  # wait for the server to close properly
         )
 
+
 class WebSocketPongTerminal(IRemotePongTerminal):
-    
+
     def initialize(self):
-        logger.info(
-            f"[{self.__class__.__name__}] Using WebSockets as the communication technology"
-        )
+        self.log("Using WebSockets as the communication technology")
         from dpongpy.remote.comm.web_sockets.ws_client import WebSocketSession
 
         self.client = WebSocketSession(
@@ -117,12 +115,12 @@ class WebSocketPongTerminal(IRemotePongTerminal):
         asyncio.run_coroutine_threadsafe(
             self._handle_ingoing_messages_async(), loop=self.event_loop
         )
-        
+
     def send_event(self, event):
         loop = asyncio.get_event_loop()
         # Execute event on the event loop in a blocking way
         loop.run_until_complete(self.client.send(serialize(event)))
-    
+
     async def _handle_ingoing_messages_async(self):
         assert self.running, "Client is not running"
         while self.running:
@@ -134,6 +132,7 @@ class WebSocketPongTerminal(IRemotePongTerminal):
                 ), f"Expected {pygame.event.Event}, got {type(message)}"
                 pygame.event.post(message)
             elif self.running:
-                raise RuntimeError(
-                    f"[{self.__class__.__name__}] Receive operation returned None"
+                self.error(
+                    "Receive operation returned None: the client may have been closed ahead of time"
                 )
+                raise RuntimeError("Receive operation returned None")

@@ -2,7 +2,7 @@ import threading
 from dpongpy import PongGame, Settings
 from dpongpy.model import Pong
 from dpongpy.remote.centralised import DEFAULT_HOST, DEFAULT_PORT
-from dpongpy.remote.centralised.ipong_coordinator import Loggable
+from dpongpy.log import Loggable
 
 import pygame
 from pygame.event import Event
