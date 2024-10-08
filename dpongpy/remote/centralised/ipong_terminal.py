@@ -1,5 +1,7 @@
+import threading
 from dpongpy import PongGame, Settings
 from dpongpy.model import Pong
+from dpongpy.remote.centralised import DEFAULT_HOST, DEFAULT_PORT
 from dpongpy.remote.centralised.ipong_coordinator import Loggable
 
 import pygame
@@ -7,13 +9,13 @@ from pygame.event import Event
 from dpongpy import PongGame, Settings
 from dpongpy.controller import ControlEvent
 from dpongpy.model import *
-from dpongpy.remote.presentation import deserialize
+from dpongpy.remote.presentation import deserialize, serialize
 from dpongpy.log import logger
 
 
 class IRemotePongTerminal(PongGame, Loggable):
     """
-    A terminal interface for a remote Pong game, 
+    A terminal interface for a remote Pong game,
     which allows interaction through network communication protocols such as WebSockets, ZMQ, or UDP.
 
     Methods that must be overrriden:
@@ -25,12 +27,13 @@ class IRemotePongTerminal(PongGame, Loggable):
     Methods that must be implemented by subclasses:
 
     - initialize() -> None
-    
+
         This method is responsible for initializing the remote Pong terminal and setting up any necessary configurations or connections to a server over the specified network protocol (WebSockets, ZMQ, etc.).
 
     - send_event(event: Event) -> None
-    
-        This method is used to transmit events from the local client (terminal) to a remote server or another client. 
+
+        This method is used to transmit events from the local client (terminal) to a remote server or another client.
+        Default implementation works for ZMQ and UDP. Websockets MUST override this method.
     """
 
     def __init__(self, settings: Settings = None):
@@ -42,7 +45,9 @@ class IRemotePongTerminal(PongGame, Loggable):
         super().__init__(settings)
         self.pong.reset_ball((0, 0))
         self.communication_technology = settings.comm_technology
+        
         self.initialize()
+
 
     def initialize(self):
         raise NotImplementedError("Must be implemented by subclasses")
@@ -51,16 +56,11 @@ class IRemotePongTerminal(PongGame, Loggable):
         self.__handle_ingoing_messages()
 
     def send_event(self, event):
-        #FIXME: remove comments
-        
-        # WEBSOCKETS
-        # loop = asyncio.get_event_loop()
-        # # Execute event on the event loop in a blocking way
-        # loop.run_until_complete(terminal.client.send(serialize(event)))
-
-        # ZMQ and UDP
-        # terminal.client.send(serialize(event))
-        raise NotImplementedError("Must be implemented by subclasses")
+        if isinstance(self, WebSocketPongTerminal):
+            raise NotImplementedError(
+                "WebSocketPongTerminal requires a different implementation of send_event"
+            )
+        self.client.send(serialize(event))
 
     def create_controller(terminal, paddle_commands=None):
         from dpongpy.controller.local import EventHandler, PongInputHandler
@@ -127,3 +127,22 @@ class IRemotePongTerminal(PongGame, Loggable):
         self.client.close()
         logger.info("Terminal stopped gracefully")
         super().after_run()
+        
+
+class SyncPongTerminal(IRemotePongTerminal):
+    def initialize(self, client_class):
+        host = self.settings.host or DEFAULT_HOST
+        port = self.settings.port or DEFAULT_PORT
+
+        self.client = client_class((host, port))
+
+        self.receiving_thread = threading.Thread(
+            target=super().handle_ingoing_messages, daemon=True
+        )
+        self.receiving_thread.start()
+        self._peers = set()
+        self._lock = threading.RLock()
+
+    def send_event(self, event):
+        self.client.send(serialize(event))
+

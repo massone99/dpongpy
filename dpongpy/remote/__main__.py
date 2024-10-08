@@ -1,4 +1,4 @@
-from dpongpy.remote.udp import Server, Client, Session
+from dpongpy.remote.comm.udp.udp import Server, Client, Session
 import argparse
 import threading
 import queue

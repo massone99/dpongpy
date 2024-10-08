@@ -1,77 +1,16 @@
 # Import required modules
-import threading
-from dpongpy.remote.centralised.ipong_terminal import IRemotePongTerminal
-from dpongpy.remote.presentation import deserialize, serialize
+from dpongpy.remote.centralised import DEFAULT_PORT
+from dpongpy.remote.centralised.ipong_terminal import SyncPongTerminal
 from dpongpy.remote.centralised.ipong_coordinator import (
-    DEFAULT_HOST,
-    DEFAULT_PORT,
-    IRemotePongCoordinator,
+    SyncPongCoordinator,
 )
-from dpongpy.log import logger
-import pygame
 
-
-class ZmqPongCoordinator(IRemotePongCoordinator):
+class ZmqPongCoordinator(SyncPongCoordinator):
     def initialize(self):
-        print(f"[{self.__class__.__name__}] Using ZMQ as the communication technology")
         from dpongpy.remote.comm.zmq.zmq_server import Server as ZMQServer
-
         self.server = ZMQServer(self.settings.port or DEFAULT_PORT)
 
-        self.receiving_thread = threading.Thread(
-            target=self.__handle_ingoing_messages, daemon=True
-        )
-        self.receiving_thread.start()
-        self._peers = set()
-        self._lock = threading.RLock()
-
-
-    def __handle_ingoing_messages(self):
-        try:
-            max_retries = 3
-            while self.running:
-                message, sender = self.server.receive()
-                if sender is not None:
-                    self.add_peer(sender)
-                    message = deserialize(message)
-                    assert isinstance(
-                        message, pygame.event.Event
-                    ), f"Expected {pygame.event.Event}, got {type(message)}"
-                    pygame.event.post(message)
-                elif self.running:
-                    logger.warn(
-                        "Receive operation returned None: the server may have been closed ahead of time"
-                    )
-                    max_retries -= 1
-                    if max_retries == 0:
-                        break
-        except Exception as e:
-            self.running = False
-            raise e
-
-class ZmqPongTerminal(IRemotePongTerminal):
+class ZmqPongTerminal(SyncPongTerminal):
     def initialize(self):
         from dpongpy.remote.comm.zmq.zmq_client import Client as ZMQClient
-        from dpongpy.remote.udp import Client as UDPClient
-
-        if self.communication_technology == "zmq":
-            client_class = ZMQClient
-        else:
-            client_class = UDPClient
-
-        host = self.settings.host or DEFAULT_HOST
-        port = self.settings.port or DEFAULT_PORT
-
-        self.client = client_class((host, port))
-
-        self.receiving_thread = threading.Thread(
-            target=super().handle_ingoing_messages, daemon=True
-        )
-        self.receiving_thread.start()
-        self._peers = set()
-        self._lock = threading.RLock()
-    
-    def send_event(self,event):
-        self.client.send(serialize(event))
-    
-    
+        super().initialize(ZMQClient)

@@ -1,10 +1,10 @@
 import threading
 from dpongpy.controller import ControlEvent
-from dpongpy.remote.centralised.ipong_coordinator import (
+from dpongpy.remote.centralised import (
     DEFAULT_HOST,
     DEFAULT_PORT,
-    IRemotePongCoordinator,
 )
+from dpongpy.remote.centralised.ipong_coordinator import IRemotePongCoordinator
 from dpongpy.remote.centralised.ipong_terminal import IRemotePongTerminal
 from dpongpy.remote.presentation import deserialize, serialize
 import asyncio
@@ -124,7 +124,6 @@ class WebSocketPongTerminal(IRemotePongTerminal):
         loop.run_until_complete(self.client.send(serialize(event)))
     
     async def _handle_ingoing_messages_async(self):
-        # FIXME: check duplication with method of server
         assert self.running, "Client is not running"
         while self.running:
             message = await self.client.receive()

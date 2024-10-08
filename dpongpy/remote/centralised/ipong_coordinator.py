@@ -1,30 +1,48 @@
+import threading
 from dpongpy import PongGame, Settings
 from dpongpy.controller import ControlEvent
 from dpongpy.model import Direction, Pong
-from dpongpy.remote.presentation import serialize
+from dpongpy.remote.presentation import deserialize, serialize
 from dpongpy.view import PongView
 from dpongpy.log import logger
-
-DEFAULT_HOST = "localhost"
-DEFAULT_PORT = 12345
+import pygame
 
 class Loggable:
-  @classmethod
-  def log(cls, template, *args, **kwargs):
-    level = kwargs.get('level', logger.DEBUG)
-    logger.log(level, f'[{cls.__name__}]' + template, *args)
-  
-  @classmethod
-  def error(cls, template, *args, **kwargs):
-    type = kwargs.get('type', RuntimeError)
-    return type((f'[{cls.__name__}]' + template) % args)
+    @classmethod
+    def log(cls, template, *args, **kwargs):
+        level = kwargs.get("level", logger.DEBUG)
+        logger.log(level, f"[{cls.__name__}]{template}", *args)
+
+    @classmethod
+    def error(cls, template, *args, **kwargs):
+        type = kwargs.get("type", RuntimeError)
+        return type(f"[{cls.__name__}]{template}" % args)
 
 
 class IRemotePongCoordinator(PongGame, Loggable):
+    """
+    This is the base class for all remote Pong coordinators.
+
+    Methods that need to be implemented:
+        - initialize(): 
+            This method should implement the specific initialization
+            linked to each technology (e.g. UDP, ZMQ, WebSockets).
+        - start_server(): 
+            This method should start the server for the chosen communication technology.
+        - broadcast_to_all_peers(message): 
+            This method should broadcast a message to all connected peers.
+        - __handle_ingoing_messages(): 
+            This method should handle incoming messages from peers.
+        - _broadcast_to_all_peers(message): 
+            This method should broadcast a message to all connected peers.
+    """
+
     def __init__(self, settings: Settings = None):
         settings = settings or Settings()
         settings.initial_paddles = []
-        PongGame.__init__(self, settings) # cambia il modo in cui si chiama il super costruttore nel l'ereditarietà multipla
+        PongGame.__init__(
+            self, settings
+        )  # cambia il modo in cui si chiama il super costruttore nel l'ereditarietà multipla
         self.pong.reset_ball((0, 0))
         self.communication_technology = settings.comm_technology
         self.initialize()
@@ -42,6 +60,7 @@ class IRemotePongCoordinator(PongGame, Loggable):
     def broadcast_to_all_peers(self, message):
         raise NotImplementedError("Must be implemented by subclasses")
 
+    
     def create_view(coordinator):
         from dpongpy.controller.local import ControlEvent
         from dpongpy.view import ShowNothingPongView
@@ -84,8 +103,28 @@ class IRemotePongCoordinator(PongGame, Loggable):
 
         return Controller(coordinator.pong)
 
-    def __handle_ingoing_messages(self):
-        raise NotImplementedError("Must be implemented by subclasses")
+    def handle_ingoing_messages(self):
+        try:
+            max_retries = 3
+            while self.running:
+                message, sender = self.server.receive()
+                if sender is not None:
+                    self.add_peer(sender)
+                    message = deserialize(message)
+                    assert isinstance(
+                        message, pygame.event.Event
+                    ), f"Expected {pygame.event.Event}, got {type(message)}"
+                    pygame.event.post(message)
+                elif self.running:
+                    logger.warn(
+                        "Receive operation returned None: the server may have been closed ahead of time"
+                    )
+                    max_retries -= 1
+                    if max_retries == 0:
+                        break
+        except Exception as e:
+            self.running = False
+            raise e
 
     def before_run(self):
         logger.info("Coordinator starting")
@@ -114,10 +153,20 @@ class IRemotePongCoordinator(PongGame, Loggable):
             self._peers.add(peer)
 
     def _broadcast_to_all_peers(self, message):
-        '''
+        """
         Default implementation. Suitable for sychronous communication like ZMQ or UDP.
         Not compatible with WebSockets implementation
-        '''
+        """
         event = serialize(message)
         for peer in self.peers:
             self.server.send(peer, event)
+
+class SyncPongCoordinator(IRemotePongCoordinator):
+    def __init__(self, settings: Settings = None):
+        super().__init__(settings)
+        self.receiving_thread = threading.Thread(
+            target=self.handle_ingoing_messages, daemon=True
+        )
+        self.receiving_thread.start()
+        self._peers = set()
+        self._lock = threading.RLock()
