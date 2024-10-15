@@ -1,8 +1,6 @@
 [tool.poetry]
 name = "dpongpy"
-packages = [
-    { include = "dpongpy" },
-]
+packages = [{ include = "dpongpy" }]
 version = "2.1.6"
 description = "A template for Python projects, using Poetry"
 authors = ["Giovanni Ciatto <giovanni.ciatto@unibo.it>"]
@@ -46,3 +44,10 @@ priority = "primary"
 
 [tool.mypy]
 ignore_missing_imports = true
+
+[tool.pyright]
+include = ["dpongpy", "tests"]
+exclude = ["**/node_modules", "**/__pycache__"]
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "off"
