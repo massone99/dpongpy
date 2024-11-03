@@ -15,6 +15,8 @@ asyncio = "^3.4.3"
 websockets = "^13.0.1"
 fastapi = "^0.115.0"
 uvicorn = "^0.30.6"
+protobuf = "3.20.0"
+etcd3 = "^0.12.0"
 
 [tool.poetry.group.dev.dependencies]
 coverage = "^7.4.0"
