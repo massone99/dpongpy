@@ -85,14 +85,14 @@ PONG_LOBBY_SCHEMA = {
 }
 
 EMPTY_LOBBY = {
-    "gameId": "",
+    "gameId": "default-game",
     "players": [
         {"playerId": "", "x": 0, "y": 0},
         {"playerId": "", "x": 0, "y": 0},
     ],
     "ball": {"position": {"x": 0, "y": 0}, "velocity": {"x": 0, "y": 0}},
     "gameState": "waiting",
-    "approved": False,
+    "approved": False
 }
 
 

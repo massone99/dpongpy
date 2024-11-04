@@ -5,20 +5,35 @@ import pygame
 from dataclasses import dataclass, field
 
 
+
 @dataclass
-class Settings:
+class BaseSettings:
+    """Base configuration shared between distributed and etcd modes"""
     config: Config = field(default_factory=Config)
     debug: bool = False
-    size: tuple = (800, 600)
     fps: int = 60
+    num_players: int = 2
+    size: tuple = (800, 600)
+
+@dataclass 
+class DistributedSettings(BaseSettings):
+    """Settings for local/UDP/ZMQ/WS gameplay"""
     host: Optional[str] = None
     port: Optional[int] = None
-    initial_paddles: tuple[Direction, Direction] = (Direction.LEFT, Direction.RIGHT)
     comm_technology: str = "udp"
+    initial_paddles: tuple[Direction, Direction] = (Direction.LEFT, Direction.RIGHT)
+
+@dataclass
+class EtcdSettings(BaseSettings):
+    """Settings for etcd-based distributed gameplay based on etcd"""
+    etcd_host: str = "localhost"
+    etcd_port: int = 2379
+    game_id: str = "default-game"
+    player_id: Optional[str] = None
 
 class PongGame:
-    def __init__(self, settings: Settings = None):
-        self.settings = settings or Settings()
+    def __init__(self, settings: DistributedSettings = None):
+        self.settings = settings or DistributedSettings()
         self.pong = Pong(
             size=self.settings.size,
             config=self.settings.config,
@@ -77,5 +92,5 @@ class PongGame:
 
 def main(settings = None):
     if settings is None:
-        settings = Settings()
+        settings = DistributedSettings()
     PongGame(settings).run()

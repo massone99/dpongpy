@@ -1,16 +1,16 @@
 import threading
-from dpongpy import PongGame, Settings
-from dpongpy.model import Pong
-from dpongpy.remote.centralised import DEFAULT_HOST, DEFAULT_PORT
-from dpongpy.log import Loggable
+import time
+import uuid
 
 import pygame
 from pygame.event import Event
-from dpongpy import PongGame, Settings
+
+from dpongpy import PongGame, DistributedSettings
 from dpongpy.controller import ControlEvent
+from dpongpy.log import Loggable
 from dpongpy.model import *
+from dpongpy.remote.centralised import DEFAULT_HOST, DEFAULT_PORT
 from dpongpy.remote.presentation import deserialize, serialize
-from dpongpy.log import logger
 
 
 class IRemotePongTerminal(PongGame, Loggable):
@@ -36,18 +36,17 @@ class IRemotePongTerminal(PongGame, Loggable):
         Default implementation works for ZMQ and UDP. Websockets MUST override this method.
     """
 
-    def __init__(self, settings: Settings = None):
-        super().__init__(settings)
-        settings = settings or Settings()
+    def __init__(self, settings: DistributedSettings = None):
+        self.settings = settings or DistributedSettings()
+        super().__init__(self.settings)
         assert (
-            len(settings.initial_paddles) == 1
+            len(self.settings.initial_paddles) == 1
         ), "Only one paddle is allowed in terminal mode"
-        super().__init__(settings)
+        super().__init__(self.settings)
         self.pong.reset_ball((0, 0))
-        self.communication_technology = settings.comm_technology
-        
-        self.initialize()
+        self.communication_technology = self.settings.comm_technology
 
+        self.initialize()
 
     def initialize(self):
         raise NotImplementedError("Must be implemented by subclasses")
@@ -127,7 +126,7 @@ class IRemotePongTerminal(PongGame, Loggable):
         self.client.close()
         logger.info("Terminal stopped gracefully")
         super().after_run()
-        
+
 
 class SyncPongTerminal(IRemotePongTerminal):
     def initialize(self, client_class):
@@ -145,4 +144,3 @@ class SyncPongTerminal(IRemotePongTerminal):
 
     def send_event(self, event):
         self.client.send(serialize(event))
-

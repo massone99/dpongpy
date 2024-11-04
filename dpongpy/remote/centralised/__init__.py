@@ -1,8 +1,9 @@
-from dpongpy import Settings
+from dpongpy import DistributedSettings, EtcdSettings
 from dpongpy.model import *
 
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12345
+
 
 def main_coordinator(settings=None):
     comm_tech = settings.comm_technology
@@ -24,19 +25,26 @@ def main_coordinator(settings=None):
 
 
 def main_terminal(settings=None):
-    comm_tech = settings.comm_technology
-    match comm_tech:
-        case "web_sockets":
-            from dpongpy.remote.ws import WebSocketPongTerminal
+    match settings:
+        case DistributedSettings():
+            comm_tech = settings.comm_technology
+            match comm_tech:
+                case "web_sockets":
+                    from dpongpy.remote.ws import WebSocketPongTerminal
 
-            WebSocketPongTerminal(settings).run()
-        case "zmq":
-            from dpongpy.remote.zmq import ZmqPongTerminal
+                    WebSocketPongTerminal(settings).run()
+                case "zmq":
+                    from dpongpy.remote.zmq import ZmqPongTerminal
 
-            ZmqPongTerminal(settings).run()
-        case "udp":
-            from dpongpy.remote.udp import UdpPongTerminal
+                    ZmqPongTerminal(settings).run()
+                case "udp":
+                    from dpongpy.remote.udp import UdpPongTerminal
 
-            UdpPongTerminal(settings).run()
-        case _:
-            raise ValueError(f"Unknown comm_tech: {comm_tech}")
+                    UdpPongTerminal(settings).run()
+                case _:
+                    raise ValueError(f"Unknown comm_tech: {comm_tech}")
+        case EtcdSettings():
+            logger.info("Etcd settings detected. Starting etcd terminal.")
+
+            from dpongpy.etcd.etcd_pong_terminal import EtcdPongTerminal
+            EtcdPongTerminal(settings).run()

@@ -17,7 +17,9 @@ def run_lobby_server(host: str, api_port: int, ws_port: int, num_players: int):
     :param api_port: Port number for the RESTful API.
     :param ws_port: Port number for the WebSocket server.
     """
-    server = LobbyServer(host=host, api_port=api_port, ws_port=ws_port, num_players=num_players)
+    server = LobbyServer(
+        host=host, api_port=api_port, ws_port=ws_port, num_players=num_players
+    )
     server.run()
 
 
@@ -105,7 +107,7 @@ def arg_parser():
 
 
 def args_to_settings(args):
-    settings = dpongpy.Settings()
+    settings = dpongpy.DistributedSettings()
     settings.host = args.host
     settings.port = args.port
     settings.debug = args.debug

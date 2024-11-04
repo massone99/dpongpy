@@ -1,5 +1,5 @@
 import threading
-from dpongpy import PongGame, Settings
+from dpongpy import PongGame, DistributedSettings
 from dpongpy.controller import ControlEvent
 from dpongpy.log import Loggable
 from dpongpy.model import Direction, Pong
@@ -26,8 +26,8 @@ class IRemotePongCoordinator(PongGame, Loggable):
             This method should broadcast a message to all connected peers.
     """
 
-    def __init__(self, settings: Settings = None):
-        settings = settings or Settings()
+    def __init__(self, settings: DistributedSettings = None):
+        settings = settings or DistributedSettings()
         settings.initial_paddles = []
         PongGame.__init__(
             self, settings
@@ -151,7 +151,7 @@ class IRemotePongCoordinator(PongGame, Loggable):
             self.server.send(peer, event)
 
 class SyncPongCoordinator(IRemotePongCoordinator):
-    def __init__(self, settings: Settings = None):
+    def __init__(self, settings: DistributedSettings = None):
         super().__init__(settings)
         self.receiving_thread = threading.Thread(
             target=self.handle_ingoing_messages, daemon=True

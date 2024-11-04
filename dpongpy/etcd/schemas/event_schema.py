@@ -1,5 +1,25 @@
+import json
+
 from jsonschema import validate, ValidationError
 from dpongpy.log import logger
+
+
+def encode_event(event_dict: dict) -> str:
+    """
+    Encode an event dictionary into a JSON string.
+    Validates against PONG_EVENT_SCHEMA before encoding.
+
+    Returns:
+        str: JSON encoded event
+    Raises:
+        ValidationError: If event doesn't match schema
+        JSONEncodeError: If event can't be encoded
+    """
+    if not validate_event(event_dict):
+        raise ValidationError("Event validation failed")
+
+    return json.dumps(event_dict, indent=2)
+
 
 PONG_EVENT_SCHEMA = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -46,8 +66,15 @@ PONG_EVENT_SCHEMA = {
                 # To manage events related to PADDLE_MOVE
                 {
                     "properties": {
-                        "direction": {"type": "string", "enum": ["UP", "DOWN"]},
-                        "paddleIndex": {"type": "integer", "minimum": 0, "maximum": 1},
+                        "direction": {"type": "string", "enum": ["UP", "DOWN", "NONE"]},
+                        "paddleIndex": {
+                            "type": "object",
+                            "properties": {
+                                "x": {"type": "number", "enum": [-1, 0, 1]},
+                                "y": {"type": "number", "enum": [-1, 0, 1]},
+                            },
+                            "required": ["x", "y"],
+                        },
                     },
                     "required": ["direction", "paddleIndex"],
                     "if": {"properties": {"eventType": {"const": "PADDLE_MOVE"}}},

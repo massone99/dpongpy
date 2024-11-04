@@ -1,1 +1,13 @@
 poetry==1.8.3
+
+dpongpy~=2.1.6
+jsonschema~=4.23.0
+etcd3~=0.12.0
+pygame~=2.6.0
+pyzmq~=26.2.0
+websockets~=13.0.1
+asyncio~=3.4.3
+requests~=2.32.3
+uvicorn~=0.30.6
+fastapi~=0.115.0
+pydantic~=2.9.2
