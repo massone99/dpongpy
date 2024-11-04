@@ -1,0 +1,102 @@
+from jsonschema import validate, ValidationError
+from dpongpy.log import logger
+
+PONG_EVENT_SCHEMA = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Pong Game Event Schema",
+    "type": "object",
+    "properties": {
+        "eventId": {"type": "string", "description": "Unique identifier for the event"},
+        "eventType": {
+            "type": "string",
+            "enum": [
+                "PLAYER_JOIN",
+                "PLAYER_LEAVE",
+                "PADDLE_MOVE",
+                "GAME_START",
+                "GAME_OVER",
+                "TIME_ELAPSED",
+            ],
+            "description": "Type of game event",
+        },
+        "timestamp": {
+            "type": "number",
+            "description": "Event timestamp in milliseconds",
+        },
+        "gameId": {
+            "type": "string",
+            "description": "ID of the game this event belongs to",
+        },
+        "playerId": {
+            "type": "string",
+            "description": "ID of the player who generated the event",
+        },
+        "payload": {
+            "type": "object",
+            # "oneOf" is used to specify that a value must validate against exactly one of the provided schemas.
+            "oneOf": [
+                # To manage events related to PLAYER_JOIN
+                {
+                    "properties": {
+                        "side": {"type": "string", "enum": ["LEFT", "RIGHT"]}
+                    },
+                    "required": ["side"],
+                    "if": {"properties": {"eventType": {"const": "PLAYER_JOIN"}}},
+                },
+                # To manage events related to PADDLE_MOVE
+                {
+                    "properties": {
+                        "direction": {"type": "string", "enum": ["UP", "DOWN"]},
+                        "paddleIndex": {"type": "integer", "minimum": 0, "maximum": 1},
+                    },
+                    "required": ["direction", "paddleIndex"],
+                    "if": {"properties": {"eventType": {"const": "PADDLE_MOVE"}}},
+                },
+                # To manage events related to TIME_ELAPSED
+                {
+                    "properties": {
+                        "dt": {"type": "number"},
+                        "gameState": {
+                            "type": "object",
+                            "properties": {
+                                "ball": {
+                                    "type": "object",
+                                    "properties": {
+                                        "x": {"type": "number"},
+                                        "y": {"type": "number"},
+                                        "vx": {"type": "number"},
+                                        "vy": {"type": "number"},
+                                    },
+                                    "required": ["x", "y", "vx", "vy"],
+                                }
+                            },
+                            "required": ["ball"],
+                        },
+                    },
+                    "required": ["dt", "gameState"],
+                    "if": {"properties": {"eventType": {"const": "TIME_ELAPSED"}}},
+                },
+            ],
+        },
+    },
+    "required": ["eventId", "eventType", "timestamp", "gameId", "playerId"],
+}
+
+EMPTY_EVENT = {
+    "eventId": "",
+    "eventType": "GAME_START",
+    "timestamp": 0,
+    "gameId": "",
+    "playerId": "",
+    "payload": {},
+}
+
+
+def validate_event(data: dict) -> bool:
+    """Validate the event data against the schema."""
+    try:
+        validate(instance=data, schema=PONG_EVENT_SCHEMA)
+        return True
+    except ValidationError as e:
+        logger.error(f"Event validation error: {e}")
+        return False
