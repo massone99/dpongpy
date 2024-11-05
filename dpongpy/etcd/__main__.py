@@ -2,9 +2,8 @@ import argparse
 import json
 
 import etcd3
-
 import dpongpy
-from dpongpy.etcd.schemas.lobby_schema import EMPTY_LOBBY, validate_lobby_data
+from dpongpy.etcd.schemas.lobby_schema import EMPTY_LOBBY, validate_lobby_data, LOBBY_KEY
 from dpongpy.log import logger
 
 
@@ -79,14 +78,13 @@ def args_to_settings(args):
     return settings
 
 
-def retrieve_game_id(lobby_data) -> str:
+def retrieve_game_id() -> str:
     """
     Retrieve or create game ID from lobby data.
     Returns the game ID string.
     """
-    key = "pong_lobby"
-    client = etcd3.client()
-
+    client = etcd3.client(host="localhost", port=2379)
+    lobby_data, metadata = client.get(LOBBY_KEY)
     try:
         if lobby_data:
             # Parse existing lobby data
@@ -97,12 +95,12 @@ def retrieve_game_id(lobby_data) -> str:
 
         # Create new lobby if data invalid or missing
         logger.info("Creating new lobby with default game ID")
-        client.put(key, json.dumps(EMPTY_LOBBY, indent=4))
+        client.put(LOBBY_KEY, json.dumps(EMPTY_LOBBY, indent=4))
 
         # Verify creation
-        new_data = client.get(key)
+        new_data = client.get(LOBBY_KEY)
         if not new_data:
-            raise Exception(f"Failed to create key '{key}' in etcd")
+            raise Exception(f"Failed to create LOBBY_KEY '{LOBBY_KEY}' in etcd")
 
         parsed_new_data = json.loads(new_data[0].decode("utf-8"))
         logger.info(f"Created new lobby with game ID: {parsed_new_data['gameId']}")
@@ -110,7 +108,7 @@ def retrieve_game_id(lobby_data) -> str:
 
     except json.JSONDecodeError:
         logger.error(f"Invalid JSON in lobby data, resetting to default")
-        client.put(key, json.dumps(EMPTY_LOBBY, indent=4))
+        client.put(LOBBY_KEY, json.dumps(EMPTY_LOBBY, indent=4))
         return EMPTY_LOBBY["gameId"]
     except Exception as e:
         logger.error(f"Error retrieving game ID: {e}")
@@ -124,12 +122,9 @@ if __name__ == "__main__":
 
     import dpongpy.remote.centralised
 
-    client = etcd3.client()
-    key = "pong_lobby"
-    value, metadata = client.get(key)
-
-    game_id = retrieve_game_id(value)
+    game_id = retrieve_game_id()
     settings.game_id = game_id
+
     # Create the pong game
     dpongpy.remote.centralised.main_terminal(settings)
     exit(0)

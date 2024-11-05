@@ -2,6 +2,8 @@ from jsonschema import validate, ValidationError
 
 from dpongpy.log import logger
 
+LOBBY_KEY = "pong_lobby"
+
 PONG_LOBBY_SCHEMA = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Distributed Pong Game Schema",

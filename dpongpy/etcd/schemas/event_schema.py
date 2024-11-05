@@ -21,6 +21,25 @@ def encode_event(event_dict: dict) -> str:
     return json.dumps(event_dict, indent=2)
 
 
+def decode_event(event_str: str) -> dict:
+    """
+    Decode a JSON string into an event dictionary.
+    Validates against PONG_EVENT_SCHEMA after decoding.
+
+    Returns:
+        dict: Decoded event
+    Raises:
+        ValidationError: If event doesn't match schema
+        JSONDecodeError: If event can't be decoded
+    """
+    event_dict = json.loads(event_str)
+    if not validate_event(event_dict):
+        raise ValidationError("Event validation failed")
+
+    return event_dict
+
+EVENTS_KEY_PREFIX = "pong_events"
+
 PONG_EVENT_SCHEMA = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Pong Game Event Schema",
