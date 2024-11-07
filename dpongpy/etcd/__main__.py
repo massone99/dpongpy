@@ -2,8 +2,9 @@ import argparse
 import json
 
 import etcd3
+
 import dpongpy
-from dpongpy.etcd.schemas.lobby_schema import EMPTY_LOBBY, validate_lobby_data, LOBBY_KEY
+from dpongpy.etcd.schemas.lobby_schema import validate_lobby_data, LOBBY_KEY, create_empty_lobby
 from dpongpy.log import logger
 
 
@@ -78,24 +79,20 @@ def args_to_settings(args):
     return settings
 
 
-def retrieve_game_id() -> str:
-    """
-    Retrieve or create game ID from lobby data.
-    Returns the game ID string.
-    """
+def retrieve_game_id(settings: dpongpy.EtcdSettings) -> str:
     client = etcd3.client(host="localhost", port=2379)
     lobby_data, metadata = client.get(LOBBY_KEY)
     try:
         if lobby_data:
-            # Parse existing lobby data
             parsed_data = json.loads(lobby_data.decode("utf-8"))
             if validate_lobby_data(parsed_data):
                 logger.info(f"Found valid lobby with game ID: {parsed_data['gameId']}")
                 return parsed_data["gameId"]
 
-        # Create new lobby if data invalid or missing
+        # Create new lobby with settings-based positions
         logger.info("Creating new lobby with default game ID")
-        client.put(LOBBY_KEY, json.dumps(EMPTY_LOBBY, indent=4))
+        empty_lobby = create_empty_lobby(size=settings.size)  # Use settings size
+        client.put(LOBBY_KEY, json.dumps(empty_lobby, indent=4))
 
         # Verify creation
         new_data = client.get(LOBBY_KEY)
@@ -108,8 +105,9 @@ def retrieve_game_id() -> str:
 
     except json.JSONDecodeError:
         logger.error(f"Invalid JSON in lobby data, resetting to default")
-        client.put(LOBBY_KEY, json.dumps(EMPTY_LOBBY, indent=4))
-        return EMPTY_LOBBY["gameId"]
+        empty_lobby = create_empty_lobby(size=settings.size)  # Use settings size
+        client.put(LOBBY_KEY, json.dumps(empty_lobby, indent=4))
+        return empty_lobby["gameId"]
     except Exception as e:
         logger.error(f"Error retrieving game ID: {e}")
         raise
@@ -122,7 +120,7 @@ if __name__ == "__main__":
 
     import dpongpy.remote.centralised
 
-    game_id = retrieve_game_id()
+    game_id = retrieve_game_id(settings)
     settings.game_id = game_id
 
     # Create the pong game

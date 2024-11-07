@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from jsonschema import validate, ValidationError
 from dpongpy.log import logger
@@ -37,6 +38,24 @@ def decode_event(event_str: str) -> dict:
         raise ValidationError("Event validation failed")
 
     return event_dict
+
+def put_event(client, event):
+    try:
+        unique_id = str(uuid.uuid4())
+        key = f"{EVENTS_KEY_PREFIX}/{unique_id}"
+        lease = client.lease(60)  # Create a lease with a 60-second TTL
+        result = client.put(
+            key,
+            encode_event(event),
+            lease=lease
+        )
+        if not result:
+            logger.error("Failed to put event to etcd: No result returned")
+        logger.debug(f"Put event to etcd on key '{key}' with lease ID {lease.id}")
+        logger.debug(f"Data: {json.dumps(event, indent=4)}")
+    except Exception as e:
+        logger.error(f"Failed to put event to etcd: {e}")
+        raise e
 
 EVENTS_KEY_PREFIX = "pong_events"
 
@@ -144,5 +163,5 @@ def validate_event(data: dict) -> bool:
         validate(instance=data, schema=PONG_EVENT_SCHEMA)
         return True
     except ValidationError as e:
-        logger.error(f"Event validation error: {e}")
-        return False
+        # logger.error(f"Event validation error: {e}")
+        raise e

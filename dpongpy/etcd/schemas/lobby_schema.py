@@ -6,7 +6,7 @@ LOBBY_KEY = "pong_lobby"
 
 PONG_LOBBY_SCHEMA = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "Distributed Pong Game Schema",
+    "title": "Distributed Pong Lobby Data Schema",
     "type": "object",
     "properties": {
         "gameId": {
@@ -15,7 +15,7 @@ PONG_LOBBY_SCHEMA = {
         },
         "players": {
             "type": "array",
-            "minItems": 2,
+            "minItems": 0,  # Allow for an empty list of players
             "maxItems": 2,
             "items": {
                 "type": "object",
@@ -32,10 +32,15 @@ PONG_LOBBY_SCHEMA = {
                         "type": "number",
                         "description": "Vertical position of the player's paddle.",
                     },
+                    "direction": {
+                        "type": "string",
+                        "enum": ["NONE", "LEFT", "UP", "RIGHT", "DOWN"],
+                        "description": "Current direction of the player's paddle.",
+                    },
                 },
-                "required": ["playerId", "x", "y"],
+                "required": ["playerId", "x", "y", "direction"],
             },
-            "description": "Array containing two player objects.",
+            "description": "Array containing zero to two player objects.",
         },
         "ball": {
             "type": "object",
@@ -80,22 +85,35 @@ PONG_LOBBY_SCHEMA = {
         "approved": {
             "type": "boolean",
             "description": "Whether the state has been evaluated by the leader.",
-            "default": False
+            "default": False,
         },
     },
     "required": ["gameId", "players", "ball", "gameState"],
 }
 
-EMPTY_LOBBY = {
-    "gameId": "default-game",
-    "players": [
-        {"playerId": "", "x": 0, "y": 0},
-        {"playerId": "", "x": 0, "y": 0},
-    ],
-    "ball": {"position": {"x": 0, "y": 0}, "velocity": {"x": 0, "y": 0}},
-    "gameState": "waiting",
-    "approved": False
-}
+
+def create_empty_lobby(size=(800, 600), padding_ratio=0.05):
+    """Creates an empty lobby with properly positioned paddles and ball"""
+    width, height = size
+    padding = width * padding_ratio  # 5% of width for padding
+
+    return {
+        "gameId": "default-game",
+        "players": [],  # No players initially
+        # Ball - positioned at center
+        "ball": {
+            "position": {
+                "x": width / 2,
+                "y": height / 2
+            },
+            "velocity": {"x": 0, "y": 0}
+        },
+        "gameState": "waiting",
+        "approved": False
+    }
+
+
+EMPTY_LOBBY = create_empty_lobby()
 
 
 def validate_lobby_data(data: dict) -> bool:
