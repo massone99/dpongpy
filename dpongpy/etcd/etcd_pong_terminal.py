@@ -115,22 +115,32 @@ class EtcdPongTerminal(PongGame, Loggable):
     def update_local_state(self, lobby_data):
         # Update paddles
         for player in lobby_data['players']:
-            if player['direction'] != 'NONE':
-                paddle_position = Vector2(player['x'], player['y'])
+            paddle_position = Vector2(player['x'], player['y'])
+            # Create paddle with proper size from config
+            paddle_ratio = self.pong.config.paddle_ratio
+            side = Direction[player['direction']]
+            if side.is_vertical:
+                paddle_ratio = (paddle_ratio.y, paddle_ratio.x)
+            paddle_size = self.pong.size.elementwise() * paddle_ratio
+            if not [p for p in self.pong.paddles if p.side == Direction[player['direction']]]:
                 # Create paddle with proper size from config
                 paddle_ratio = self.pong.config.paddle_ratio
                 side = Direction[player['direction']]
                 if side.is_vertical:
                     paddle_ratio = (paddle_ratio.y, paddle_ratio.x)
                 paddle_size = self.pong.size.elementwise() * paddle_ratio
+                new_paddle = Paddle(size=paddle_size, side=side, position=paddle_position)
+                self.pong.add_paddle(side=side, paddle=new_paddle)
+                logger.info(f"[LOCAL] Added new paddle on {side.name}")
+            if [p for p in self.pong.paddles if p.side == Direction[player['direction']]]:
                 updated_paddle = Paddle(size=paddle_size, side=side, position=paddle_position)
                 current_paddle = [p for p in self.pong.paddles if p.side == updated_paddle.side]
                 # assert len(current_paddle) == 1, f"Expected 1 paddle, got {len(current_paddle)}"
                 if len(current_paddle) == 1:
                     old_paddle_pos = current_paddle[0].position
                     current_paddle[0].override(updated_paddle)
-                    logger.info(f"[LOCAL] Updated paddle position from {old_paddle_pos} to {updated_paddle.position}")
-
+                    logger.debug(
+                        f"[LOCAL] Updated {updated_paddle.side.name} paddle position from {old_paddle_pos} to {updated_paddle.position}")
         # Update ball position
         ball_position = lobby_data['ball']['position']
         self.pong.ball.position = Vector2(ball_position['x'], ball_position['y'])
@@ -162,13 +172,13 @@ class EtcdPongTerminal(PongGame, Loggable):
                     # Update the paddle position using the amount in the payload
                     player["x"] += event["payload"]["paddleIndex"].get("x")
                     player["y"] += event["payload"]["paddleIndex"].get("y")
-                    logger.info(f"[ETCD] Updated paddle position from {old_pos} to {player['x'], player['y']}")
+                    logger.debug(f"[ETCD] Updated paddle position from {old_pos} to {player['x'], player['y']}")
                     break
 
         # Validate and update etcd
         try:
             validate_lobby_data(lobby)
-            self.client.put(LOBBY_KEY, json.dumps(lobby, indent=4), lease=self.client.lease(ttl=5))
+            self.client.put(LOBBY_KEY, json.dumps(lobby, indent=4), lease=self.client.lease(ttl=60))
         except ValidationError as ve:
             logger.error(f"Lobby data validation failed: {ve}")
 
