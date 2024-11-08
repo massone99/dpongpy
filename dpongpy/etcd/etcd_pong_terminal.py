@@ -6,10 +6,11 @@ import uuid
 import etcd3
 from jsonschema import ValidationError
 from pygame.event import Event
+from typing_extensions import List
 
 from dpongpy import PongGame, EtcdSettings
 from dpongpy.controller import ControlEvent
-from dpongpy.etcd.ClusterTerminal import ClusterTerminal
+from dpongpy.etcd.cluster_terminal import ClusterTerminal
 from dpongpy.etcd.schemas.event_schema import (decode_event, EVENTS_KEY_PREFIX, put_event, )
 from dpongpy.etcd.schemas.lobby_schema import (LOBBY_KEY, validate_lobby_data, create_empty_lobby, )
 from dpongpy.log import Loggable
@@ -52,8 +53,14 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
         return create_empty_lobby(size=self.pong.size)
 
     def update_local_state(self, lobby_data):
-        # Update paddles
+        paddles_in_lobby: List[Direction] = [Direction[player['direction']] for player in lobby_data['players']]
+        missing_paddles = [p for p in self.pong.paddles if p.side not in paddles_in_lobby]
+
+        for mp in missing_paddles:
+            self.pong.remove_paddle(mp.side)
+
         for player in lobby_data['players']:
+            # Update paddles positions
             paddle_position = Vector2(player['x'], player['y'])
             # Create paddle with proper size from config
             paddle_ratio = self.pong.config.paddle_ratio
@@ -62,16 +69,18 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
                 paddle_ratio = (paddle_ratio.y, paddle_ratio.x)
             paddle_size = self.pong.size.elementwise() * paddle_ratio
             if not [p for p in self.pong.paddles if p.side == Direction[player['direction']]]:
-                # Create paddle with proper size from config
+                # Check if the player exists in the current paddles
+                # If not found, add a new paddle
                 paddle_ratio = self.pong.config.paddle_ratio
                 side = Direction[player['direction']]
                 if side.is_vertical:
                     paddle_ratio = (paddle_ratio.y, paddle_ratio.x)
                 paddle_size = self.pong.size.elementwise() * paddle_ratio
                 new_paddle = Paddle(size=paddle_size, side=side, position=paddle_position)
-                self.pong.add_paddle(side=side, paddle=new_paddle)
-                logger.info(f"[LOCAL] Added new paddle on {side.name}")
+                self.pong.add_paddle(side=side,
+                                     paddle=new_paddle)  # logger.info(f"[LOCAL] Added new paddle on {side.name}")
             if [p for p in self.pong.paddles if p.side == Direction[player['direction']]]:
+                # If found, update the paddle position
                 updated_paddle = Paddle(size=paddle_size, side=side, position=paddle_position)
                 current_paddle = [p for p in self.pong.paddles if p.side == updated_paddle.side]
                 # assert len(current_paddle) == 1, f"Expected 1 paddle, got {len(current_paddle)}"
@@ -131,9 +140,6 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
                 logger.error(f"Failed to resign from leadership: {e}")
 
     def player_join(self, player_id, side):
-        # Get current lobby state
-        lobby = self.get_lobby_data()
-
         # Calculate paddle position
         paddle_ratio = self.pong.config.paddle_ratio
         if side.is_vertical:
@@ -141,7 +147,8 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
 
         paddle_size = Vector2(self.pong.size).elementwise() * paddle_ratio
         padding = (
-            self.pong.width * self.pong.config.paddle_padding + paddle_size.x / 2 if side.is_horizontal else self.pong.height * self.pong.config.paddle_padding + paddle_size.y / 2)
+            self.pong.width * self.pong.config.paddle_padding + paddle_size.x / 2
+            if side.is_horizontal else self.pong.height * self.pong.config.paddle_padding + paddle_size.y / 2)
 
         # Calculate position based on side
         if side == Direction.UP:
@@ -153,26 +160,15 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
         else:  # LEFT
             position = Vector2(padding, self.pong.height / 2)
 
-        # Create player data
-        player_data = {"playerId": player_id, "direction": side.name, "x": position.x, "y": position.y, }
-
-        # Remove player with same side if already exists
-        # lobby["players"] = [player for player in lobby["players"] if player["direction"] != side.name]
-
-        lobby["players"].append(player_data)
-
-        # Update lobby in etcd
-        try:
-            validate_lobby_data(lobby)
-            self.client.put(LOBBY_KEY, json.dumps(lobby, indent=4))
-            logger.info(f"Added player to lobby: {player_data}")
-        except ValidationError as ve:
-            logger.error(f"Lobby validation failed: {ve}")
-
         # Also create the join event
         event = {"eventId": str(uuid.uuid4()), "eventType": "PLAYER_JOIN", "timestamp": int(time.time() * 1000),
                  "gameId": self.settings.game_id, "playerId": player_id,
                  "payload": {"side": side.name, "x": position.x, "y": position.y, }, }
+        put_event(self.client, event)
+
+    def player_leave(self, player_id):
+        event = {"eventId": str(uuid.uuid4()), "eventType": "PLAYER_LEAVE", "timestamp": int(time.time() * 1000),
+                 "gameId": self.settings.game_id, "playerId": player_id, }
         put_event(self.client, event)
 
     def create_controller(terminal, paddle_commands=None):
@@ -199,13 +195,10 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
                 if isinstance(paddle_index, Direction):
                     event = {"eventId": str(uuid.uuid4()), "eventType": "PADDLE_MOVE",
                              "timestamp": int(time.time() * 1000), "gameId": terminal.settings.game_id,
-                             "playerId": terminal.settings.player_id,
-                             "payload": {"direction": direction.name,
-                                         "paddleIndex": {
-                                             "x": direction.value.x,
-                                             "y": direction.value.y, },
-                                         },
-                             }
+                             "playerId": terminal.settings.player_id, "payload": {"direction": direction.name,
+                                                                                  "paddleIndex": {
+                                                                                      "x": direction.value.x,
+                                                                                      "y": direction.value.y, }, }, }
                     put_event(terminal.client, event)
 
             def on_game_over(self, pong: Pong):
@@ -231,6 +224,8 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
         logger.info("Terminal stopped gracefully")
         # Resign leadership if currently the leader
         self.resign_leadership()
+        # Emit "PLAYER_LEAVE" event on the etcd server
+        self.player_leave(self.settings.player_id)
         super().after_run()
 
     def stop(self):
