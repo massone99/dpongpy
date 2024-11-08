@@ -16,6 +16,8 @@ def encode_event(event_dict: dict) -> str:
         ValidationError: If event doesn't match schema
         JSONEncodeError: If event can't be encoded
     """
+    # if event_dict["payload"]["direction"] == 'RIGHT':
+
     if not validate_event(event_dict):
         raise ValidationError("Event validation failed")
 
@@ -39,11 +41,11 @@ def decode_event(event_str: str) -> dict:
 
     return event_dict
 
-def put_event(client, event):
+def put_event(client, event, ttl=60):
     try:
         unique_id = str(uuid.uuid4())
         key = f"{EVENTS_KEY_PREFIX}/{unique_id}"
-        lease = client.lease(60)  # Create a lease with a 60-second TTL
+        lease = client.lease(ttl)  # Create a lease with a 60-second TTL
         result = client.put(
             key,
             encode_event(event),
@@ -91,7 +93,6 @@ PONG_EVENT_SCHEMA = {
         },
         "payload": {
             "type": "object",
-            # "oneOf" is used to specify that a value must validate against exactly one of the provided schemas.
             "oneOf": [
                 # To manage events related to PLAYER_JOIN
                 {
@@ -163,5 +164,4 @@ def validate_event(data: dict) -> bool:
         validate(instance=data, schema=PONG_EVENT_SCHEMA)
         return True
     except ValidationError as e:
-        # logger.error(f"Event validation error: {e}")
-        raise e
+        logger.error(f"Event validation error: {e}")

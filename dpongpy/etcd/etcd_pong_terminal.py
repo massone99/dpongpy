@@ -59,6 +59,15 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
         for mp in missing_paddles:
             self.pong.remove_paddle(mp.side)
 
+        self.update_paddles_state(lobby_data)
+
+        ball = lobby_data['ball']
+        logger.info(f"Ball position: {ball['position']['x']}, {ball['position']['y']}")
+        logger.info(f"Ball velocity: {ball['velocity']['x']}, {ball['velocity']['y']}")
+        self.pong.ball.position = Vector2(ball['position']['x'], ball['position']['y'])
+        self.pong.ball.speed = Vector2(ball['velocity']['x'], ball['velocity']['y'])
+
+    def update_paddles_state(self, lobby_data):
         for player in lobby_data['players']:
             # Update paddles positions
             paddle_position = Vector2(player['x'], player['y'])
@@ -83,15 +92,11 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
                 # If found, update the paddle position
                 updated_paddle = Paddle(size=paddle_size, side=side, position=paddle_position)
                 current_paddle = [p for p in self.pong.paddles if p.side == updated_paddle.side]
-                # assert len(current_paddle) == 1, f"Expected 1 paddle, got {len(current_paddle)}"
                 if len(current_paddle) == 1:
                     old_paddle_pos = current_paddle[0].position
                     current_paddle[0].override(updated_paddle)
                     logger.debug(
                         f"[LOCAL] Updated {updated_paddle.side.name} paddle position from {old_paddle_pos} to {updated_paddle.position}")
-        # Update ball position
-        ball_position = lobby_data['ball']['position']
-        self.pong.ball.position = Vector2(ball_position['x'], ball_position['y'])
 
     def update_lobby_data(self, event):
         lobby_data, metadata = self.client.get(LOBBY_KEY)
@@ -110,6 +115,11 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
                                        "x": event["payload"].get("x", 0), "y": event["payload"].get("y", 0), }
                 lobby["players"].append(player_join_payload)
                 logger.info(f"Player joined with payload: {player_join_payload}")
+
+                # Start ball movement when 2 players have joined
+                if len(lobby["players"]) == 2:
+                    lobby["ball"]["velocity"] = {"x": 10, "y": 10}
+                    logger.info(f"Two players joined - Ball velocity set to {lobby['ball']['velocity']}")
         elif event["eventType"] == "PLAYER_LEAVE":
             lobby["players"] = [player for player in lobby["players"] if player["playerId"] != event["playerId"]]
         elif event["eventType"] == "PADDLE_MOVE":
@@ -121,23 +131,63 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
                     player["y"] += event["payload"]["paddleIndex"].get("y")
                     logger.debug(f"[ETCD] Updated paddle position from {old_pos} to {player['x'], player['y']}")
                     break
+        elif event["eventType"] == "TIME_ELAPSED":
+            # Update the ball position based on the current velocity
+            ball = lobby["ball"]
 
+            # Calculate new position
+            new_x = ball["position"]["x"] + ball["velocity"]["x"]
+            new_y = ball["position"]["y"] + ball["velocity"]["y"]
+
+            # Create ball rectangle for collision detection
+            ball_size = Vector2(self.pong.width * self.pong.config.ball_ratio)
+            ball_rect = Rectangle(
+                Vector2(new_x - ball_size.x/2, new_y - ball_size.y/2),
+                Vector2(new_x + ball_size.x/2, new_y + ball_size.y/2)
+            )
+
+            # Check paddle collisions
+            for player in lobby["players"]:
+                # Create paddle rectangle
+                paddle_ratio = self.pong.config.paddle_ratio
+                side = Direction[player["direction"]]
+                if side.is_vertical:
+                    paddle_ratio = (paddle_ratio.y, paddle_ratio.x)
+                paddle_size = self.pong.size.elementwise() * paddle_ratio
+
+                paddle_rect = Rectangle(
+                    Vector2(player["x"] - paddle_size.x/2, player["y"] - paddle_size.y/2),
+                    Vector2(player["x"] + paddle_size.x/2, player["y"] + paddle_size.y/2)
+                )
+
+                # Check collision with paddle
+                hits = ball_rect.hits(paddle_rect)
+                for direction, delta in hits.items():
+                    if delta > 0.0:
+                        if direction.is_horizontal:
+                            ball["velocity"]["x"] *= -1
+                        if direction.is_vertical:
+                            ball["velocity"]["y"] *= -1
+
+            # Handle wall collisions
+            if new_x <= 0 or new_x >= self.pong.width:
+                ball["velocity"]["x"] *= -1  # Reverse x velocity
+                new_x = max(0, min(new_x, self.pong.width))
+
+            if new_y <= 0 or new_y >= self.pong.height:
+                ball["velocity"]["y"] *= -1  # Reverse y velocity
+                new_y = max(0, min(new_y, self.pong.height))
+
+            # Update position
+            ball["position"]["x"] = new_x
+            ball["position"]["y"] = new_y
+            # ball["position"]["x"] += ball["velocity"]["x"]  # ball["position"]["y"] += ball["velocity"]["y"]
         # Validate and update etcd
         try:
             validate_lobby_data(lobby)
             self.client.put(LOBBY_KEY, json.dumps(lobby, indent=4), lease=self.client.lease(ttl=60))
         except ValidationError as ve:
             logger.error(f"Lobby data validation failed: {ve}")
-
-    def resign_leadership(self):
-        """Resign from leadership by deleting the leadership key."""
-        if self.is_leader() and self.lease:
-            try:
-                self.client.delete("election/leader")
-                self.lease.revoke()
-                logger.info("Resigned from leadership.")
-            except Exception as e:
-                logger.error(f"Failed to resign from leadership: {e}")
 
     def player_join(self, player_id, side):
         # Calculate paddle position
@@ -147,8 +197,7 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
 
         paddle_size = Vector2(self.pong.size).elementwise() * paddle_ratio
         padding = (
-            self.pong.width * self.pong.config.paddle_padding + paddle_size.x / 2
-            if side.is_horizontal else self.pong.height * self.pong.config.paddle_padding + paddle_size.y / 2)
+            self.pong.width * self.pong.config.paddle_padding + paddle_size.x / 2 if side.is_horizontal else self.pong.height * self.pong.config.paddle_padding + paddle_size.y / 2)
 
         # Calculate position based on side
         if side == Direction.UP:
@@ -188,8 +237,20 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
             def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None):
                 if status is None or pong is status:
                     pong.update(dt)
+
+                    # Only the terminal leader should emit the TIME_ELAPSED event
+                    if terminal.is_leader():
+                        gameState = {
+                            "ball": {"x": pong.ball.position.x, "y": pong.ball.position.y, "vx": pong.ball.speed.x,
+                                     "vy": pong.ball.speed.y, }}
+                        event = {"eventId": str(uuid.uuid4()), "eventType": "TIME_ELAPSED",
+                                 "timestamp": int(time.time() * 1000), "gameId": terminal.settings.game_id,
+                                 "playerId": terminal.settings.player_id,
+                                 "payload": {"dt": dt, "gameState": gameState}, }
+                        put_event(terminal.client, event, ttl=1)
                 else:
-                    pong.override(status)
+                    # pong.override(status)
+                    pass
 
             def on_paddle_move(self, pong: Pong, paddle_index: int | Direction, direction: Direction):
                 if isinstance(paddle_index, Direction):

@@ -1,11 +1,12 @@
-from dpongpy.controller import *
 from typing import Iterable
+
+from dpongpy.controller import *
 
 
 def _normalize_commands(
         pong: Pong,
         paddles: dict[Direction, ActionMap] | Iterable[Direction] | None
-    ) -> dict[Direction, ActionMap]:
+) -> dict[Direction, ActionMap]:
     if paddles is dict:
         assert set(paddles.keys()) == {p.side for p in pong.paddles}, "All paddles must come with an ActionMap"
         return paddles
@@ -38,14 +39,32 @@ class PongInputHandler(InputHandler):
     def key_pressed(self, key: int):
         for paddle_index, action in self._get_paddle_actions(key).items():
             if action in PlayerAction.all_moves():
-                self.post_event(ControlEvent.PADDLE_MOVE, paddle_index=paddle_index, direction=action.to_direction())
+                # Get the paddle's side and the action's direction
+                paddle_side = paddle_index
+                action_direction = action.to_direction()
+
+                # Only post event if movement direction is valid for the paddle
+                if (paddle_side.is_horizontal and action_direction.is_vertical) or \
+                        (paddle_side.is_vertical and action_direction.is_horizontal):
+                    self.post_event(ControlEvent.PADDLE_MOVE,
+                                    paddle_index=paddle_index,
+                                    direction=action_direction)
             elif action == PlayerAction.QUIT:
                 self.post_event(ControlEvent.PLAYER_LEAVE, paddle_index=paddle_index)
 
     def key_released(self, key: int):
         for paddle_index, action in self._get_paddle_actions(key).items():
             if action in PlayerAction.all_moves():
-                self.post_event(ControlEvent.PADDLE_MOVE, paddle_index=paddle_index, direction=Direction.NONE)
+                # Get the paddle's side and the action's direction
+                paddle_side = paddle_index
+                action_direction = action.to_direction()
+
+                # Only post event if movement direction is valid for the paddle
+                if (paddle_side.is_horizontal and action_direction.is_vertical) or \
+                        (paddle_side.is_vertical and action_direction.is_horizontal):
+                    self.post_event(ControlEvent.PADDLE_MOVE,
+                                    paddle_index=paddle_index,
+                                    direction=Direction.NONE)
 
     def handle_inputs(self, dt=None):
         for event in pygame.event.get(self.INPUT_EVENTS):

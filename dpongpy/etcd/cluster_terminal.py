@@ -23,24 +23,37 @@ class ClusterTerminal(ABC):
 
     def is_leader(self) -> bool:
         current_leader = self.client.get("election/leader")
+        leadership_lease = self.client.lease(ttl=5)
         if current_leader:
             if current_leader[0]:
-                return current_leader[0] == self.settings.player_id
+                return current_leader[0].decode('utf-8') == self.settings.player_id
             else:
                 self.client.delete("election/leader")
+                self.lease = leadership_lease
                 self.client.put("election/leader", self.settings.player_id, self.lease)
                 logger.info("This client is the leader.")
                 return True
         else:
             # FIXME: SIDE EFFECT
+            self.lease = leadership_lease
             return self.client.put_if_not_exists("election/leader", self.settings.player_id, self.lease)
+
+    def resign_leadership(self):
+        """Resign from leadership by deleting the leadership key."""
+        if self.is_leader() and self.lease:
+            try:
+                self.client.delete("election/leader")
+                self.lease.revoke()
+                logger.info("Resigned from leadership.")
+            except Exception as e:
+                logger.error(f"Failed to resign from leadership: {e}")
+
 
     def campaign_for_leadership(self):
         """Attempt to become the leader using etcd's election mechanism."""
         while True:
             try:
                 # Setting a lease to be fault-tolerant in case the leader crashes
-                self.lease = self.client.lease(ttl=5)
                 is_leader = self.is_leader()
                 while self.lease and is_leader:
                     logger.debug("This client is the leader.")
