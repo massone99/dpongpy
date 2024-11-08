@@ -26,7 +26,7 @@ class PongInputHandler(InputHandler):
         assert len(self._pong.paddles) == len(self._paddles_commands), "Number of paddles and commands must match"
         for side, keymap in self._paddles_commands.items():
             logger.info(f"Player {side.name} controls: {keymap.name}")
-    
+
     def _get_paddle_actions(self, key: int) -> dict[Direction, PlayerAction]:
         result = dict()
         for side, paddle_commands in self._paddles_commands.items():

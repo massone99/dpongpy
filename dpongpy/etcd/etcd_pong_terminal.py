@@ -9,80 +9,19 @@ from pygame.event import Event
 
 from dpongpy import PongGame, EtcdSettings
 from dpongpy.controller import ControlEvent
+from dpongpy.etcd.ClusterTerminal import ClusterTerminal
 from dpongpy.etcd.schemas.event_schema import (decode_event, EVENTS_KEY_PREFIX, put_event, )
 from dpongpy.etcd.schemas.lobby_schema import (LOBBY_KEY, validate_lobby_data, create_empty_lobby, )
 from dpongpy.log import Loggable
 from dpongpy.model import *
 
 
-class EtcdPongTerminal(PongGame, Loggable):
+class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
     def __init__(self, settings: EtcdSettings = None):
         self.settings = settings or EtcdSettings()
-        # Generate player_id if not provided
-        if not self.settings.player_id:
-            self.settings.player_id = str(uuid.uuid4())
+        ClusterTerminal.__init__(self, self.settings)
         super().__init__(self.settings)
         self.pong.reset_ball((0, 0))
-        self.client = etcd3.client(host=self.settings.etcd_host, port=self.settings.etcd_port)
-
-        # Initialize leadership variables
-        self.leader = False
-        self.lease = None
-        self.leader_thread = threading.Thread(target=self.campaign_for_leadership)
-        self.leader_thread.daemon = True  # Ensure thread exits with main program
-        self.leader_thread.start()
-
-    def campaign_for_leadership(self):
-        """Attempt to become the leader using etcd's election mechanism."""
-
-        def is_leader() -> bool:
-            current_leader = self.client.get("election/leader")
-            # Checking if the player id of the leader is None
-            if current_leader:
-                if current_leader[0]:
-                    return current_leader[0] == self.settings.player_id
-                else:
-                    self.client.delete("election/leader")
-                    self.client.put("election/leader", self.settings.player_id, self.lease)
-                    logger.info("This client is the leader.")
-                    return True
-            else:
-                return self.client.put_if_not_exists("election/leader", self.settings.player_id, self.lease)
-
-        while True:
-            try:
-                self.lease = self.client.lease(ttl=5)  # Create a lease with a TTL of 5 seconds
-                is_leader = is_leader()
-                while is_leader:
-                    self.leader = True
-                    logger.debug("This client is the leader.")
-                    # Start leadership responsibilities
-                    self.process_events()
-                    # Keep the lease alive to maintain leadership
-                    self.lease.refresh()
-                    logger.debug("Lease refreshed; still the leader.")
-                if not is_leader:
-                    self.leader = False
-                    logger.info("This client is a follower; observing the leader.")
-                    self.observe_leader()
-            except Exception as e:
-                logger.error(f"Error during leadership campaign: {e}")
-                if self.lease:
-                    self.lease.revoke()
-                time.sleep(5)  # Wait before retrying
-
-    def observe_leader(self):
-        """Watch the leadership key to detect leader changes."""
-        events_iterator, cancel = self.client.watch("election/leader")
-        for event in events_iterator:
-            if isinstance(event, etcd3.events.DeleteEvent):
-                logger.info("Leader key deleted; attempting to become the leader.")
-                cancel()
-                break
-            elif isinstance(event, etcd3.events.PutEvent):
-                logger.info(f"New leader elected: {event.value.decode()}")
-        # After detecting leader key deletion, retry leadership campaign
-        self.campaign_for_leadership()
 
     def process_events(self):
         """Handle actions to perform when becoming the leader."""
@@ -152,7 +91,6 @@ class EtcdPongTerminal(PongGame, Loggable):
         else:
             lobby = create_empty_lobby(size=self.pong.size)
             logger.error("Lobby data not found; initializing with empty lobby.")
-
         if event["eventType"] == "PLAYER_JOIN":
             # Check if player already exists
             player_id = event["playerId"]
@@ -184,11 +122,10 @@ class EtcdPongTerminal(PongGame, Loggable):
 
     def resign_leadership(self):
         """Resign from leadership by deleting the leadership key."""
-        if self.leader and self.lease:
+        if self.is_leader() and self.lease:
             try:
                 self.client.delete("election/leader")
                 self.lease.revoke()
-                self.leader = False
                 logger.info("Resigned from leadership.")
             except Exception as e:
                 logger.error(f"Failed to resign from leadership: {e}")
@@ -219,7 +156,9 @@ class EtcdPongTerminal(PongGame, Loggable):
         # Create player data
         player_data = {"playerId": player_id, "direction": side.name, "x": position.x, "y": position.y, }
 
-        # Update lobby players
+        # Remove player with same side if already exists
+        # lobby["players"] = [player for player in lobby["players"] if player["direction"] != side.name]
+
         lobby["players"].append(player_data)
 
         # Update lobby in etcd
@@ -257,7 +196,6 @@ class EtcdPongTerminal(PongGame, Loggable):
                     pong.override(status)
 
             def on_paddle_move(self, pong: Pong, paddle_index: int | Direction, direction: Direction):
-                # Only the leader can update the game state
                 if isinstance(paddle_index, Direction):
                     event = {"eventId": str(uuid.uuid4()), "eventType": "PADDLE_MOVE",
                              "timestamp": int(time.time() * 1000), "gameId": terminal.settings.game_id,
