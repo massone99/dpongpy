@@ -15,28 +15,31 @@ class ClusterTerminal(ABC):
         # Generate player_id if not provided
         if not self.settings.player_id:
             self.settings.player_id = str(uuid.uuid4())
-        self.client = etcd3.client(host=self.settings.etcd_host, port=self.settings.etcd_port)
-        self.lease = None
+        self.client = etcd3.client(
+            host=self.settings.etcd_host, port=self.settings.etcd_port
+        )
+        self.lease = self.client.lease(ttl=5)
         self.leader_thread = threading.Thread(target=self.campaign_for_leadership)
         self.leader_thread.daemon = True  # Ensure thread exits with main program
         self.leader_thread.start()
 
+    def become_leader(self):
+        return self.client.put_if_not_exists(
+            "election/leader", self.settings.player_id, self.lease
+        )
+
     def is_leader(self) -> bool:
         current_leader = self.client.get("election/leader")
-        leadership_lease = self.client.lease(ttl=5)
         if current_leader:
             if current_leader[0]:
-                return current_leader[0].decode('utf-8') == self.settings.player_id
+                return current_leader[0].decode("utf-8") == self.settings.player_id
             else:
                 self.client.delete("election/leader")
-                self.lease = leadership_lease
                 self.client.put("election/leader", self.settings.player_id, self.lease)
                 logger.info("This client is the leader.")
                 return True
         else:
-            # FIXME: SIDE EFFECT
-            self.lease = leadership_lease
-            return self.client.put_if_not_exists("election/leader", self.settings.player_id, self.lease)
+            return False
 
     def resign_leadership(self):
         """Resign from leadership by deleting the leadership key."""
@@ -48,13 +51,12 @@ class ClusterTerminal(ABC):
             except Exception as e:
                 logger.error(f"Failed to resign from leadership: {e}")
 
-
     def campaign_for_leadership(self):
         """Attempt to become the leader using etcd's election mechanism."""
         while True:
             try:
                 # Setting a lease to be fault-tolerant in case the leader crashes
-                is_leader = self.is_leader()
+                is_leader = self.is_leader() or self.become_leader()
                 while self.lease and is_leader:
                     logger.debug("This client is the leader.")
                     # Update distributed state using events from other terminals

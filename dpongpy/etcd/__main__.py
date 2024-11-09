@@ -4,7 +4,11 @@ import json
 import etcd3
 
 import dpongpy
-from dpongpy.etcd.schemas.lobby_schema import validate_lobby_data, LOBBY_KEY, create_empty_lobby
+from dpongpy.etcd.schemas.lobby_schema import (
+    validate_lobby_data,
+    LOBBY_KEY,
+    create_empty_lobby,
+)
 from dpongpy.log import logger
 
 
@@ -104,7 +108,7 @@ def retrieve_game_id(settings: dpongpy.EtcdSettings) -> str:
         return parsed_new_data["gameId"]
 
     except json.JSONDecodeError:
-        logger.error(f"Invalid JSON in lobby data, resetting to default")
+        logger.error("Invalid JSON in lobby data, resetting to default")
         empty_lobby = create_empty_lobby(size=settings.size)  # Use settings size
         client.put(LOBBY_KEY, json.dumps(empty_lobby, indent=4))
         return empty_lobby["gameId"]
