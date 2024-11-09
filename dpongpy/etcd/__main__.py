@@ -12,10 +12,6 @@ from dpongpy.etcd.schemas.lobby_schema import (
 from dpongpy.log import logger
 
 
-# python -m dpongpy.etcd --host localhost --port 2379 --side left --keys arrows
-# python -m dpongpy.etcd --side left --keys arrows
-
-
 def arg_parser():
     ap = argparse.ArgumentParser()
     ap.prog = "python -m " + dpongpy.__name__
