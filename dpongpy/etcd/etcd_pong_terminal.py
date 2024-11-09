@@ -75,26 +75,19 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
             if side.is_vertical:
                 paddle_ratio = (paddle_ratio.y, paddle_ratio.x)
             paddle_size = self.pong.size.elementwise() * paddle_ratio
+            paddle_to_render = Paddle(size=paddle_size, side=side, position=paddle_position)
             if not [p for p in self.pong.paddles if p.side == Direction[player['direction']]]:
                 # Check if the player exists in the current paddles
-                # If not found, add a new paddle
-                paddle_ratio = self.pong.config.paddle_ratio
-                side = Direction[player['direction']]
-                if side.is_vertical:
-                    paddle_ratio = (paddle_ratio.y, paddle_ratio.x)
-                paddle_size = self.pong.size.elementwise() * paddle_ratio
-                new_paddle = Paddle(size=paddle_size, side=side, position=paddle_position)
                 self.pong.add_paddle(side=side,
-                                     paddle=new_paddle)  # logger.info(f"[LOCAL] Added new paddle on {side.name}")
-            if [p for p in self.pong.paddles if p.side == Direction[player['direction']]]:
+                                     paddle=paddle_to_render)
+            else:
                 # If found, update the paddle position
-                updated_paddle = Paddle(size=paddle_size, side=side, position=paddle_position)
-                current_paddle = [p for p in self.pong.paddles if p.side == updated_paddle.side]
+                current_paddle = [p for p in self.pong.paddles if p.side == paddle_to_render.side]
                 if len(current_paddle) == 1:
                     old_paddle_pos = current_paddle[0].position
-                    current_paddle[0].override(updated_paddle)
+                    current_paddle[0].override(paddle_to_render)
                     logger.debug(
-                        f"[LOCAL] Updated {updated_paddle.side.name} paddle position from {old_paddle_pos} to {updated_paddle.position}")
+                        f"[LOCAL] Updated {paddle_to_render.side.name} paddle position from {old_paddle_pos} to {paddle_to_render.position}")
 
     def update_lobby_data(self, event):
         lobby_data, metadata = self.client.get(LOBBY_KEY)
@@ -140,8 +133,8 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
             # Create ball rectangle for collision detection
             ball_size = Vector2(self.pong.width * self.pong.config.ball_ratio)
             ball_rect = Rectangle(
-                Vector2(new_x - ball_size.x/2, new_y - ball_size.y/2),
-                Vector2(new_x + ball_size.x/2, new_y + ball_size.y/2)
+                Vector2(new_x - ball_size.x / 2, new_y - ball_size.y / 2),
+                Vector2(new_x + ball_size.x / 2, new_y + ball_size.y / 2)
             )
 
             # Check paddle collisions
@@ -154,8 +147,8 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
                 paddle_size = self.pong.size.elementwise() * paddle_ratio
 
                 paddle_rect = Rectangle(
-                    Vector2(player["x"] - paddle_size.x/2, player["y"] - paddle_size.y/2),
-                    Vector2(player["x"] + paddle_size.x/2, player["y"] + paddle_size.y/2)
+                    Vector2(player["x"] - paddle_size.x / 2, player["y"] - paddle_size.y / 2),
+                    Vector2(player["x"] + paddle_size.x / 2, player["y"] + paddle_size.y / 2)
                 )
 
                 # Check collision with paddle
