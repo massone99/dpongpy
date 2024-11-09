@@ -35,6 +35,7 @@ class ClusterTerminal(ABC):
                 return current_leader[0].decode("utf-8") == self.settings.player_id
             else:
                 self.client.delete("election/leader")
+                self.lease = self.client.lease(ttl=5)
                 self.client.put("election/leader", self.settings.player_id, self.lease)
                 logger.info("This client is the leader.")
                 return True
