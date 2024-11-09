@@ -67,11 +67,36 @@ class PongInputHandler(InputHandler):
                                     direction=Direction.NONE)
 
     def handle_inputs(self, dt=None):
+        # Handle one-time key press events
         for event in pygame.event.get(self.INPUT_EVENTS):
             if event.type == pygame.KEYDOWN:
                 self.key_pressed(event.key)
             elif event.type == pygame.KEYUP:
                 self.key_released(event.key)
+
+        # Handle continuous key presses
+        keys = pygame.key.get_pressed()
+        for paddle in self._pong.paddles:
+            paddle_commands = self._paddles_commands.get(paddle.side)
+            if paddle_commands:
+                # Check each movement key for this paddle
+                if keys[paddle_commands.move_up]:
+                    self.post_event(ControlEvent.PADDLE_MOVE,
+                                  paddle_index=paddle.side,
+                                  direction=Direction.UP)
+                elif keys[paddle_commands.move_down]:
+                    self.post_event(ControlEvent.PADDLE_MOVE,
+                                  paddle_index=paddle.side,
+                                  direction=Direction.DOWN)
+                elif keys[paddle_commands.move_left]:
+                    self.post_event(ControlEvent.PADDLE_MOVE,
+                                  paddle_index=paddle.side,
+                                  direction=Direction.LEFT)
+                elif keys[paddle_commands.move_right]:
+                    self.post_event(ControlEvent.PADDLE_MOVE,
+                                  paddle_index=paddle.side,
+                                  direction=Direction.RIGHT)
+
         if dt is not None:
             self.time_elapsed(dt)
 
