@@ -62,8 +62,6 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
         self.update_paddles_state(lobby_data)
 
         ball = lobby_data['ball']
-        logger.info(f"Ball position: {ball['position']['x']}, {ball['position']['y']}")
-        logger.info(f"Ball velocity: {ball['velocity']['x']}, {ball['velocity']['y']}")
         self.pong.ball.position = Vector2(ball['position']['x'], ball['position']['y'])
         self.pong.ball.speed = Vector2(ball['velocity']['x'], ball['velocity']['y'])
 
@@ -236,8 +234,6 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
 
             def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None):
                 if status is None or pong is status:
-                    pong.update(dt)
-
                     # Only the terminal leader should emit the TIME_ELAPSED event
                     if terminal.is_leader():
                         gameState = {
@@ -248,9 +244,6 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
                                  "playerId": terminal.settings.player_id,
                                  "payload": {"dt": dt, "gameState": gameState}, }
                         put_event(terminal.client, event, ttl=1)
-                else:
-                    # pong.override(status)
-                    pass
 
             def on_paddle_move(self, pong: Pong, paddle_index: int | Direction, direction: Direction):
                 if isinstance(paddle_index, Direction):
