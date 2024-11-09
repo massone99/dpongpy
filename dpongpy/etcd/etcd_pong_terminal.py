@@ -50,7 +50,7 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
 
     def watch_lobby_data(self):
         """Watch the lobby_data key to detect changes and update the game state."""
-        events_iterator, cancel = self.client.watch(LOBBY_KEY, start_revision=0)
+        events_iterator, _ = self.client.watch(LOBBY_KEY, start_revision=0)
         for event in events_iterator:
             if isinstance(event, etcd3.events.PutEvent):
                 lobby_data = json.loads(event.value.decode("utf-8"))
