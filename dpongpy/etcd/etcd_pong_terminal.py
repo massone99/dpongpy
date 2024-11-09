@@ -22,8 +22,8 @@ from dpongpy.etcd.schemas.lobby_schema import (
     validate_lobby_data,
     create_empty_lobby,
 )
-from dpongpy.log import logger
 from dpongpy.log import Loggable
+from dpongpy.log import logger
 from dpongpy.model import Rectangle, Pong, Paddle
 
 
@@ -125,7 +125,7 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
             if not any(p["playerId"] == player_id for p in lobby["players"]):
                 player_side = event["payload"].get("side")
                 assert (
-                    player_side is not None
+                        player_side is not None
                 ), "Player side must be provided in payload"
                 player_join_payload = {
                     "playerId": player_id,
@@ -160,60 +160,8 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
                     )
                     break
         elif event["eventType"] == "TIME_ELAPSED":
-            # Update the ball position based on the current velocity
-            ball = lobby["ball"]
+            self.handle_time_elapsed(lobby)
 
-            # Calculate new position
-            new_x = ball["position"]["x"] + ball["velocity"]["x"]
-            new_y = ball["position"]["y"] + ball["velocity"]["y"]
-
-            # Create ball rectangle for collision detection
-            ball_size = Vector2(self.pong.width * self.pong.config.ball_ratio)
-            ball_rect = Rectangle(
-                Vector2(new_x - ball_size.x / 2, new_y - ball_size.y / 2),
-                Vector2(new_x + ball_size.x / 2, new_y + ball_size.y / 2),
-            )
-
-            # Check paddle collisions
-            for player in lobby["players"]:
-                # Create paddle rectangle
-                paddle_ratio = self.pong.config.paddle_ratio
-                side = Direction[player["direction"]]
-                if side.is_vertical:
-                    paddle_ratio = (paddle_ratio.y, paddle_ratio.x)
-                paddle_size = self.pong.size.elementwise() * paddle_ratio
-
-                paddle_rect = Rectangle(
-                    Vector2(
-                        player["x"] - paddle_size.x / 2, player["y"] - paddle_size.y / 2
-                    ),
-                    Vector2(
-                        player["x"] + paddle_size.x / 2, player["y"] + paddle_size.y / 2
-                    ),
-                )
-
-                # Check collision with paddle
-                hits = ball_rect.hits(paddle_rect)
-                for direction, delta in hits.items():
-                    if delta > 0.0:
-                        if direction.is_horizontal:
-                            ball["velocity"]["x"] *= -1
-                        if direction.is_vertical:
-                            ball["velocity"]["y"] *= -1
-
-            # Handle wall collisions
-            if new_x <= 0 or new_x >= self.pong.width:
-                ball["velocity"]["x"] *= -1  # Reverse x velocity
-                new_x = max(0, min(new_x, self.pong.width))
-
-            if new_y <= 0 or new_y >= self.pong.height:
-                ball["velocity"]["y"] *= -1  # Reverse y velocity
-                new_y = max(0, min(new_y, self.pong.height))
-
-            # Update position
-            ball["position"]["x"] = new_x
-            ball["position"]["y"] = new_y
-            # ball["position"]["x"] += ball["velocity"]["x"]  # ball["position"]["y"] += ball["velocity"]["y"]
         # Validate and update etcd
         try:
             validate_lobby_data(lobby)
@@ -222,6 +170,55 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
             )
         except ValidationError as ve:
             logger.error(f"Lobby data validation failed: {ve}")
+
+    def handle_time_elapsed(self, lobby):
+        # Update the ball position based on the current velocity
+        ball = lobby["ball"]
+        # Calculate new position
+        new_x = ball["position"]["x"] + ball["velocity"]["x"]
+        new_y = ball["position"]["y"] + ball["velocity"]["y"]
+        # Create ball rectangle for collision detection
+        ball_size = Vector2(self.pong.width * self.pong.config.ball_ratio)
+        ball_rect = Rectangle(
+            Vector2(new_x - ball_size.x / 2, new_y - ball_size.y / 2),
+            Vector2(new_x + ball_size.x / 2, new_y + ball_size.y / 2),
+        )
+        # Check paddle collisions
+        for player in lobby["players"]:
+            # Create paddle rectangle
+            paddle_ratio = self.pong.config.paddle_ratio
+            side = Direction[player["direction"]]
+            if side.is_vertical:
+                paddle_ratio = (paddle_ratio.y, paddle_ratio.x)
+            paddle_size = self.pong.size.elementwise() * paddle_ratio
+
+            paddle_rect = Rectangle(
+                Vector2(
+                    player["x"] - paddle_size.x / 2, player["y"] - paddle_size.y / 2
+                ),
+                Vector2(
+                    player["x"] + paddle_size.x / 2, player["y"] + paddle_size.y / 2
+                ),
+            )
+
+            # Check collision with paddle
+            hits = ball_rect.hits(paddle_rect)
+            for direction, delta in hits.items():
+                if delta > 0.0:
+                    if direction.is_horizontal:
+                        ball["velocity"]["x"] *= -1
+                    if direction.is_vertical:
+                        ball["velocity"]["y"] *= -1
+        # Handle wall collisions
+        if new_x <= 0 or new_x >= self.pong.width:
+            ball["velocity"]["x"] *= -1  # Reverse x velocity
+            new_x = max(0, min(new_x, self.pong.width))
+        if new_y <= 0 or new_y >= self.pong.height:
+            ball["velocity"]["y"] *= -1  # Reverse y velocity
+            new_y = max(0, min(new_y, self.pong.height))
+        # Update position
+        ball["position"]["x"] = new_x
+        ball["position"]["y"] = new_y
 
     def player_join(self, player_id, side):
         # Calculate paddle position
@@ -308,7 +305,7 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
                         put_event(terminal.client, event, ttl=1)
 
             def on_paddle_move(
-                self, pong: Pong, paddle_index: int | Direction, direction: Direction
+                    self, pong: Pong, paddle_index: int | Direction, direction: Direction
             ):
                 if isinstance(paddle_index, Direction):
                     event = {
