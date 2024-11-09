@@ -27,9 +27,6 @@ from dpongpy.log import logger
 from dpongpy.model import Rectangle, Pong, Paddle
 
 
-# from dpongpy.model import *
-
-
 class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
     def __init__(self, settings: EtcdSettings = None):
         self.settings = settings or EtcdSettings()
