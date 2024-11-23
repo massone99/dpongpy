@@ -1,6 +1,9 @@
 import argparse
 import json
+import os
+import time
 
+import backoff
 import etcd3
 
 import dpongpy
@@ -22,17 +25,6 @@ def arg_parser():
         type=int,
         default=2,
         help="Number of players in the game (only used in centralised mode)",
-    )
-    networking = ap.add_argument_group("networking")
-    networking.add_argument(
-        "--host",
-        "-H",
-        help="Etcd server host to connect to",
-        type=str,
-        default="localhost",
-    )
-    networking.add_argument(
-        "--port", "-p", help="Port to connect to", type=int, default=2379
     )
     game = ap.add_argument_group("game")
     game.add_argument(
@@ -62,25 +54,54 @@ def arg_parser():
         default=[900, 600],
     )
     game.add_argument("--fps", "-f", help="Frames per second", type=int, default=60)
+    networking = ap.add_argument_group("networking")
+    networking.add_argument(
+        "--host",
+        help="etcd host",
+        default="etcd",
+    )
+    networking.add_argument(
+        "--port",
+        help="etcd port",
+        type=int,
+        default=2379,
+    )
+
     return ap
 
 
 def args_to_settings(args):
-    settings = dpongpy.EtcdSettings()
-    settings.host = args.host
-    settings.port = args.port
-    settings.debug = args.debug
-    settings.size = tuple(args.size)
-    settings.num_players = args.num_players
-    settings.fps = args.fps
-    settings.initial_paddles = tuple(
+    game_settings = dpongpy.EtcdSettings()
+
+    # Set etcd host and port
+    etcd_host = args.host or os.environ.get('ETCD_HOST')
+    etcd_port = args.port or os.environ.get('ETCD_PORT')
+
+    if not etcd_host or not etcd_port:
+        raise ValueError("ETCD_HOST and ETCD_PORT environment variables must be set")
+
+    game_settings.etcd_host = etcd_host
+    game_settings.etcd_port = int(etcd_port)
+    game_settings.debug = args.debug
+    game_settings.size = tuple(args.size)
+    game_settings.num_players = args.num_players
+    game_settings.fps = args.fps
+    game_settings.initial_paddles = tuple(
         dpongpy.model.Direction[dir.upper()] for dir in args.sides
     )
-    return settings
+    return game_settings
 
 
-def retrieve_game_id(settings: dpongpy.EtcdSettings) -> str:
-    client = etcd3.client(host="localhost", port=2379)
+@backoff.on_exception(backoff.expo,
+                      etcd3.exceptions.ConnectionFailedError,
+                      max_tries=5)
+def retrieve_game_id(game_settings: dpongpy.EtcdSettings) -> str:
+    logger.info(f"\033[91mRetrieving game ID from etcd at {game_settings.etcd_host}:{game_settings.etcd_port}\033[0m")
+    client = etcd3.client(host=game_settings.etcd_host, port=game_settings.etcd_port)
+
+    # Add a small delay to ensure etcd is ready
+    time.sleep(5)
+
     lobby_data, metadata = client.get(LOBBY_KEY)
     try:
         if lobby_data:
@@ -91,7 +112,7 @@ def retrieve_game_id(settings: dpongpy.EtcdSettings) -> str:
 
         # Create new lobby with settings-based positions
         logger.info("Creating new lobby with default game ID")
-        empty_lobby = create_empty_lobby(size=settings.size)  # Use settings size
+        empty_lobby = create_empty_lobby(size=game_settings.size)  # Use settings size
         client.put(LOBBY_KEY, json.dumps(empty_lobby, indent=4))
 
         # Verify creation
@@ -105,7 +126,7 @@ def retrieve_game_id(settings: dpongpy.EtcdSettings) -> str:
 
     except json.JSONDecodeError:
         logger.error("Invalid JSON in lobby data, resetting to default")
-        empty_lobby = create_empty_lobby(size=settings.size)  # Use settings size
+        empty_lobby = create_empty_lobby(size=game_settings.size)  # Use settings size
         client.put(LOBBY_KEY, json.dumps(empty_lobby, indent=4))
         return empty_lobby["gameId"]
     except Exception as e:

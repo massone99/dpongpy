@@ -15,6 +15,7 @@ class ClusterTerminal(ABC):
         # Generate player_id if not provided
         if not self.settings.player_id:
             self.settings.player_id = str(uuid.uuid4())
+        logger.info(f"Connecting to etcd at host={self.settings.etcd_host}, port={self.settings.etcd_port}")
         self.client = etcd3.client(
             host=self.settings.etcd_host, port=self.settings.etcd_port
         )

@@ -21,7 +21,7 @@ class Direction(Enum):
     @property
     def is_vertical(self) -> bool:
         return self.value.x == 0 and self.value.y != 0
-    
+
     @property
     def is_horizontal(self) -> bool:
         return self.value.y == 0 and self.value.x != 0
@@ -84,11 +84,11 @@ class Rectangle(Sized, Positioned):
     @property
     def top_right(self) -> Vector2:
         return Vector2(self.right, self.top)
-    
+
     @property
     def bottom_left(self) -> Vector2:
         return Vector2(self.left, self.bottom)
-    
+
     @property
     def corners(self) -> list[Vector2]:
         return [self.top_left, self.top_right, self.bottom_right, self.bottom_left]
@@ -96,7 +96,7 @@ class Rectangle(Sized, Positioned):
     @property
     def size(self) -> Vector2:
         return self.bottom_right - self.top_left
-    
+
     @property
     def position(self) -> Vector2:
         return (self.top_left + self.bottom_right) / 2
@@ -109,23 +109,23 @@ class Rectangle(Sized, Positioned):
 
     def is_inside(self, other) -> bool:
         return self in other
-    
+
     def __contains__(self, other) -> bool:
         if isinstance(other, Rectangle):
             return other.top_left in self and other.bottom_right in self
         else:
             x, y = other
             return self.left <= x <= self.right and self.top <= y <= self.bottom
-    
+
     def intersection_with(self, other: 'Rectangle') -> 'Rectangle':
         if self.overlaps(other):
             return Rectangle(
                 Vector2(
-                    max(self.left, other.left), 
+                    max(self.left, other.left),
                     max(self.top, other.top)
-                ), 
+                ),
                 Vector2(
-                    min(self.right, other.right), 
+                    min(self.right, other.right),
                     min(self.bottom, other.bottom)
                 )
             )
@@ -260,7 +260,7 @@ class Paddle(GameObject):
 
     def __eq__(self, other):
         return super().__eq__(other) and self.side == other.side
-    
+
     def override(self, other: GameObject):
         super().override(other)
         self.side = other.side
@@ -304,8 +304,12 @@ class Pong(Sized):
         self.table = Table(self.size)
         self.updates = 0
         self.time = 0
-        if paddles is None:
+        if paddles is None or len(paddles) == 0:
+            logger.info("paddles is None")
             paddles = (Direction.LEFT, Direction.RIGHT)
+        else:
+            logger.info("paddles not none")
+            logger.info(paddles)
         self.paddles = [paddle for paddle in paddles if isinstance(paddle, Paddle)]
         self._init_paddles((side for side in paddles if isinstance(side, Direction)))
 
@@ -377,7 +381,7 @@ class Pong(Sized):
             return self._paddles[side]
         else:
             raise KeyError(f"No such a paddle: {side}")
-        
+
     def has_paddle(self, side: Direction):
         return side in self._paddles
 
@@ -431,7 +435,7 @@ class Pong(Sized):
             selected.speed = direction.value
         else:
             logger.debug(f"Ignored attempt to move {paddle} in {direction}")
-    
+
     def stop_paddle(self, paddle: int | Direction):
         self.move_paddle(paddle, Direction.NONE)
 

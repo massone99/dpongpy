@@ -3,6 +3,7 @@ from dpongpy.model import Pong, Config, Direction
 from dpongpy.controller.local import ActionMap
 import pygame
 from dataclasses import dataclass, field
+from dpongpy.log import logger
 
 
 
@@ -15,7 +16,7 @@ class BaseSettings:
     num_players: int = 2
     size: tuple = (800, 600)
 
-@dataclass 
+@dataclass
 class DistributedSettings(BaseSettings):
     """Settings for local/UDP/ZMQ/WS gameplay"""
     host: Optional[str] = None
@@ -26,14 +27,17 @@ class DistributedSettings(BaseSettings):
 @dataclass
 class EtcdSettings(BaseSettings):
     """Settings for etcd-based distributed gameplay based on etcd"""
-    etcd_host: str = "localhost"
+    etcd_host: str = "etcd"
     etcd_port: int = 2379
     game_id: str = "default-game"
     player_id: Optional[str] = None
 
+
+
 class PongGame:
     def __init__(self, settings: DistributedSettings = None):
         self.settings = settings or DistributedSettings()
+        logger.info(f"Initial paddles: {self.settings.initial_paddles}")
         self.pong = Pong(
             size=self.settings.size,
             config=self.settings.config,
