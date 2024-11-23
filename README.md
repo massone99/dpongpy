@@ -91,7 +91,10 @@ xhost '-local:*'
 Then, run the application using Docker Compose:
 
 ```bash
-docker-compose up --build
+docker-compose build --no-cache
+
+docker-compose up
+
 ```
 
 
