@@ -78,6 +78,23 @@ Overview:
 
 ## How to do stuff
 
+### Run the application using Docker Compose
+
+First is essential to allow X Server connections from the container to the host machine:
+```bash
+xhost '+local:*'
+```
+X-server connection can then be disabled using:
+```bash
+xhost '-local:*'
+```
+Then, run the application using Docker Compose:
+
+```bash
+docker-compose up --build
+```
+
+
 ### Restore dev dependencies
 
 1. Install Poetry if you don't have it yet
@@ -121,4 +138,3 @@ The version number is updated automatically by the `semantic-release` tool, whic
 
 It is paramount that the commit messages follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification,
 in order for `semantic-release` to compute version numbers correctly.
-
