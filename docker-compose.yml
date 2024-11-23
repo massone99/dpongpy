@@ -11,9 +11,24 @@ services:
     networks:
       - dpong_network
 
-  app:
+  player_1:
     build: .
     environment:
+      - PLAYER_SIDE=left
+      - DISPLAY=${DISPLAY}
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    depends_on:
+      - etcd
+    networks:
+      - dpong_network
+
+  player_2:
+    build: .
+    environment:
+      - PLAYER_SIDE=right
       - DISPLAY=${DISPLAY}
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
