@@ -38,7 +38,9 @@ class EtcdPongTerminal(PongGame, Loggable, ClusterTerminal):
         """Handle actions to perform when becoming the leader."""
         logger.debug("Retrieving events with prefix.")
         events = self.client.get_prefix(EVENTS_KEY_PREFIX)
-        for value, metadata in events:
+        # Sort events by their creation revision
+        sorted_events = sorted(events, key=lambda x: x[1].create_revision)
+        for value, metadata in sorted_events:
             event = decode_event(value)
             self.update_lobby_data(event)
             # Delete the event after processing

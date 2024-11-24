@@ -144,3 +144,6 @@ dmypy.json
 
 # pyright
 .pyrightconfig.json
+
+# Material for report
+uml
