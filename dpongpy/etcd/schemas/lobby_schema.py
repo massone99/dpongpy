@@ -122,5 +122,4 @@ def validate_lobby_data(data: dict) -> bool:
         validate(instance=data, schema=PONG_LOBBY_SCHEMA)
         return True
     except ValidationError as e:
-        logger.error(f"Validation error: {e}")
         return False
