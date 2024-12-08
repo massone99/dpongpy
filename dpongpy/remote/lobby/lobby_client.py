@@ -11,6 +11,7 @@ class LobbyManagerClient:
     """
     LobbyManagerClient class to manage the interaction with the lobby API server.
     """
+
     def __init__(self, base_url: str, api_port: int):
         self.api_base_url = f"{base_url}:{api_port}/api/lobbies"
         self.player_name: Optional[str] = None
@@ -46,6 +47,14 @@ class LobbyManagerClient:
         return None
 
     def join_lobby(self, player_name: str) -> Optional[MessageResponse]:
+        """Joins a lobby by making a POST request to the API of the server
+
+        Args:
+            player_name (str): name of the player joining the lobby
+
+        Returns:
+            Optional[MessageResponse]: MessageResponse object with the response message and lobby details, or None if an error occurred.
+        """
         payload = {"player": player_name}
         try:
             response = requests.post(f"{self.api_base_url}/join", json=payload)
@@ -73,6 +82,11 @@ class LobbyManagerClient:
         return None
 
     def get_lobby(self) -> Optional[LobbyResponse]:
+        """Fetches the current active lobby by making a GET request to the API of the server
+
+        Returns:
+            Optional[LobbyResponse]: LobbyResponse object with the details of the current active lobby, or None if an error occurred.
+        """
         try:
             response = requests.get(self.api_base_url)
             response.raise_for_status()
@@ -99,18 +113,21 @@ class LobbyManagerClient:
         return None
 
     async def connect_websocket(self):
+        """
+        Connects to the WebSocket server of the current active lobby.
+        """
         if not self.current_lobby:
             print("No active lobby to connect to.")
             return
         websocket_url = f"ws://{self.current_lobby.address}:{self.current_lobby.port}"
         print(f"Connecting to WebSocket at {websocket_url}...")
         try:
-            async with websockets.connect(websocket_url) as websocket:
+            async with websockets.connect(websocket_url):
                 print(f"Connected to WebSocket at {websocket_url}")
                 # Start listening and sending messages concurrently
-                listener_task = asyncio.create_task(self.listen(websocket))
-                sender_task = asyncio.create_task(self.send_messages(websocket))
-                await asyncio.gather(listener_task, sender_task)
+                # listener_task = asyncio.create_task(self.listen(websocket))
+                # sender_task = asyncio.create_task(self.send_messages(websocket))
+                # await asyncio.gather(listener_task, sender_task)
         except websockets.exceptions.ConnectionClosed as e:
             print(f"WebSocket connection closed: {e.code} - {e.reason}")
         except Exception as e:
@@ -123,21 +140,21 @@ class LobbyManagerClient:
         except websockets.exceptions.ConnectionClosed:
             print("WebSocket connection closed.")
 
-    async def send_messages(self, websocket):
-        print("You can now start sending messages. Type 'exit' to disconnect.")
-        while True:
-            message = await asyncio.get_event_loop().run_in_executor(
-                None, sys.stdin.readline
-            )
-            message = message.strip()
-            if message.lower() == "exit":
-                print("Disconnecting from WebSocket...")
-                await websocket.close()
-                break
-            if message:
-                try:
-                    await websocket.send(message)
-                    print(f"Sent message: {message}")
-                except websockets.exceptions.ConnectionClosed:
-                    print("WebSocket connection closed.")
-                    break
+    # async def send_messages(self, websocket):
+    #     print("You can now start sending messages. Type 'exit' to disconnect.")
+    #     while True:
+    #         message = await asyncio.get_event_loop().run_in_executor(
+    #             None, sys.stdin.readline
+    #         )
+    #         message = message.strip()
+    #         if message.lower() == "exit":
+    #             print("Disconnecting from WebSocket...")
+    #             await websocket.close()
+    #             break
+    #         if message:
+    #             try:
+    #                 await websocket.send(message)
+    #                 print(f"Sent message: {message}")
+    #             except websockets.exceptions.ConnectionClosed:
+    #                 print("WebSocket connection closed.")
+    #                 break
