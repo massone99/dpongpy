@@ -48,7 +48,6 @@ class IRemotePongCoordinator(PongGame, Loggable):
 
     def broadcast_to_all_peers(self, message):
         raise NotImplementedError("Must be implemented by subclasses")
-
     
     def create_view(coordinator):
         from dpongpy.controller.local import ControlEvent
@@ -150,7 +149,7 @@ class IRemotePongCoordinator(PongGame, Loggable):
         for peer in self.peers:
             self.server.send(peer, event)
 
-class SyncPongCoordinator(IRemotePongCoordinator):
+class ThreadedPongCoordinator(IRemotePongCoordinator):
     def __init__(self, settings: DistributedSettings = None):
         super().__init__(settings)
         self.receiving_thread = threading.Thread(

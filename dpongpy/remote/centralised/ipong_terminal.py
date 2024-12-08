@@ -128,7 +128,7 @@ class IRemotePongTerminal(PongGame, Loggable):
         super().after_run()
 
 
-class SyncPongTerminal(IRemotePongTerminal):
+class ThreadedPongTerminal(IRemotePongTerminal):
     def initialize(self, client_class):
         host = self.settings.host or DEFAULT_HOST
         port = self.settings.port or DEFAULT_PORT
