@@ -8,12 +8,24 @@ from dpongpy.remote.lobby.response_models import LobbyResponse, MessageResponse
 
 
 class LobbyManagerClient:
+    """
+    LobbyManagerClient class to manage the interaction with the lobby API server.
+    """
     def __init__(self, base_url: str, api_port: int):
         self.api_base_url = f"{base_url}:{api_port}/api/lobbies"
         self.player_name: Optional[str] = None
         self.current_lobby: Optional[LobbyResponse] = None
 
     def create_lobby(self, name: str, max_players: int = 2) -> Optional[LobbyResponse]:
+        """Creates a lobby my making a POST request to the API of the server
+
+        Args:
+            name (str): name of the lobby
+            max_players (int, optional): maximum number of players allowed in the lobby. Defaults to 2.
+
+        Returns:
+            Optional[LobbyResponse]: LobbyResponse object with the details of the created lobby, or None if an error occurred.
+        """
         payload = {"name": name, "max_players": max_players}
         try:
             response = requests.post(self.api_base_url, json=payload)
