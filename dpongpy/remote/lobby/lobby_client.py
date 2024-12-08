@@ -124,10 +124,6 @@ class LobbyManagerClient:
         try:
             async with websockets.connect(websocket_url):
                 print(f"Connected to WebSocket at {websocket_url}")
-                # Start listening and sending messages concurrently
-                # listener_task = asyncio.create_task(self.listen(websocket))
-                # sender_task = asyncio.create_task(self.send_messages(websocket))
-                # await asyncio.gather(listener_task, sender_task)
         except websockets.exceptions.ConnectionClosed as e:
             print(f"WebSocket connection closed: {e.code} - {e.reason}")
         except Exception as e:
@@ -139,22 +135,3 @@ class LobbyManagerClient:
                 print(f"\nReceived message: {message}")
         except websockets.exceptions.ConnectionClosed:
             print("WebSocket connection closed.")
-
-    # async def send_messages(self, websocket):
-    #     print("You can now start sending messages. Type 'exit' to disconnect.")
-    #     while True:
-    #         message = await asyncio.get_event_loop().run_in_executor(
-    #             None, sys.stdin.readline
-    #         )
-    #         message = message.strip()
-    #         if message.lower() == "exit":
-    #             print("Disconnecting from WebSocket...")
-    #             await websocket.close()
-    #             break
-    #         if message:
-    #             try:
-    #                 await websocket.send(message)
-    #                 print(f"Sent message: {message}")
-    #             except websockets.exceptions.ConnectionClosed:
-    #                 print("WebSocket connection closed.")
-    #                 break
