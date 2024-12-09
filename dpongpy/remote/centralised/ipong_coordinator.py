@@ -38,12 +38,6 @@ class IRemotePongCoordinator(PongGame, Loggable):
         linked to each technology (e.g. UDP, ZMQ, WebSockets).
         """
         raise NotImplementedError("Must be implemented by subclasses")
-
-    # def start_server(self):
-    #     raise NotImplementedError("Must be implemented by subclasses")
-    #
-    # def broadcast_to_all_peers(self, message):
-    #     raise NotImplementedError("Must be implemented by subclasses")
     
     def create_view(coordinator):
         from dpongpy.controller.local import ControlEvent
