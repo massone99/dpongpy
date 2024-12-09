@@ -16,10 +16,6 @@ class IRemotePongCoordinator(PongGame, Loggable):
         - initialize(): 
             This method should implement the specific initialization
             linked to each technology (e.g. UDP, ZMQ, WebSockets).
-        - start_server(): 
-            This method should start the server for the chosen communication technology.
-        - broadcast_to_all_peers(message): 
-            This method should broadcast a message to all connected peers.
         - __handle_ingoing_messages(): 
             This method should handle incoming messages from peers.
         - _broadcast_to_all_peers(message): 
@@ -43,11 +39,11 @@ class IRemotePongCoordinator(PongGame, Loggable):
         """
         raise NotImplementedError("Must be implemented by subclasses")
 
-    def start_server(self):
-        raise NotImplementedError("Must be implemented by subclasses")
-
-    def broadcast_to_all_peers(self, message):
-        raise NotImplementedError("Must be implemented by subclasses")
+    # def start_server(self):
+    #     raise NotImplementedError("Must be implemented by subclasses")
+    #
+    # def broadcast_to_all_peers(self, message):
+    #     raise NotImplementedError("Must be implemented by subclasses")
     
     def create_view(coordinator):
         from dpongpy.controller.local import ControlEvent
