@@ -2,7 +2,7 @@ node_modules/
 
 tmp/
 .idea/
-.vscode/
+.vscode/*
 .zed/
 .DS_Store
 *.data

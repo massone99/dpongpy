@@ -26,7 +26,7 @@ class LobbyServer:
         self, host: str = "127.0.0.1", api_port: int = 8000, ws_port: int = 5000, num_players: int = 2
     ):
         """
-        Initializes the LobbyServer to serve on the specified host and port.
+        Initializes the LobbyServer to servfe on the specified host and port.
 
         :param host: Host address to bind the server.
         :param port: Port number to bind the server.
@@ -45,10 +45,26 @@ class LobbyServer:
 
         @self.app.post("/api/lobbies", response_model=LobbyResponse)
         async def create_lobby(request: CreateLobbyRequest):
+            """
+            Handles the creation of a new lobby.
+
+            Args:
+                request (CreateLobbyRequest): The request object containing the name and maximum number of players for the new lobby.
+
+            Returns:
+                dict: A dictionary representation of the created lobby, which will be automatically validated against the LobbyResponse schema, serialized to JSON, and returned with the correct Content-Type header.
+
+            Raises:
+                HTTPException: If an error occurs during lobby creation, an HTTP 400 error is raised with the error details.
+            """
             try:
                 lobby = await self.lobby_manager.create_lobby(
                     request.name, request.max_players
                 )
+                # FastAPI automatically:
+                # Validates dict against LobbyResponse schema
+                # Serializes to JSON
+                # Sets correct Content-Type header
                 return lobby.to_dict()
             except Exception as e:
                 raise HTTPException(status_code=400, detail=str(e))

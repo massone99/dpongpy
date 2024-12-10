@@ -11,4 +11,7 @@
     "python.testing.autoTestDiscoverOnSaveEnabled": true,
     "codescene.previewCodeHealthGate": true,
     "codescene.enableAutoRefactor": true,
+    "files.watcherExclude": {
+        "**/target": true
+    },
 }
