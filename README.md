@@ -78,7 +78,7 @@ Overview:
 
 ## How to do stuff
 
-### Run the application using Docker Compose
+### Run the etcd-based version using Docker Compose
 
 First is essential to allow X Server connections from the container to the host machine:
 ```bash
