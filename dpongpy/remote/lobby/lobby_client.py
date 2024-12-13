@@ -1,9 +1,7 @@
-import asyncio
-import sys
 from typing import Optional
 
 import requests
-import websockets
+
 from dpongpy.remote.lobby.response_models import LobbyResponse, MessageResponse
 
 
@@ -111,27 +109,3 @@ class LobbyManagerClient:
         except Exception as err:
             print(f"An error occurred while fetching lobby: {err}")
         return None
-
-    async def connect_websocket(self):
-        """
-        Connects to the WebSocket server of the current active lobby.
-        """
-        if not self.current_lobby:
-            print("No active lobby to connect to.")
-            return
-        websocket_url = f"ws://{self.current_lobby.address}:{self.current_lobby.port}"
-        print(f"Connecting to WebSocket at {websocket_url}...")
-        try:
-            async with websockets.connect(websocket_url):
-                print(f"Connected to WebSocket at {websocket_url}")
-        except websockets.exceptions.ConnectionClosed as e:
-            print(f"WebSocket connection closed: {e.code} - {e.reason}")
-        except Exception as e:
-            print(f"An error occurred with WebSocket connection: {e}")
-
-    async def listen(self, websocket):
-        try:
-            async for message in websocket:
-                print(f"\nReceived message: {message}")
-        except websockets.exceptions.ConnectionClosed:
-            print("WebSocket connection closed.")

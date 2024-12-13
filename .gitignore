@@ -147,3 +147,5 @@ dmypy.json
 
 # Material for report
 uml
+report.tex
+*.pdf
